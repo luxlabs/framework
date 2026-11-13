@@ -1396,8 +1396,9 @@ public class WidgetUtil {
 
     /**
      * Saves the text selection of the document if it starts and ends inside
-     * the given element and is not empty, as character offsets in the text of
-     * the element.
+     * the given element, is not empty and is anchored to a text node (which
+     * re-rendering would replace), as character offsets in the text of the
+     * element.
      * <p>
      * For internal use only. May be removed or replaced in the future.
      *
@@ -1428,6 +1429,12 @@ public class WidgetUtil {
         if (!inside(range.startContainer) || !inside(range.endContainer)) {
             return null;
         }
+        if (range.startContainer.nodeType != 3
+                && range.endContainer.nodeType != 3) {
+            // Anchored to elements (e.g. a triple click selection): it
+            // survives the replacement of the text nodes, nothing to do
+            return null;
+        }
         var offset = function(node, nodeOffset) {
             var before = $doc.createRange();
             before.setStart(container, 0);
@@ -1437,14 +1444,15 @@ public class WidgetUtil {
         return {
             start: offset(range.startContainer, range.startOffset),
             end: offset(range.endContainer, range.endOffset),
-            text: container.textContent
+            text: container.textContent,
+            selected: range.toString()
         };
     }-*/;
 
     /**
      * Restores a text selection saved with
      * {@link #saveTextSelection(Element)}, if the text of the element has not
-     * changed.
+     * changed and the browser has lost the selection.
      * <p>
      * For internal use only. May be removed or replaced in the future.
      *
@@ -1458,6 +1466,12 @@ public class WidgetUtil {
             JavaScriptObject saved)
     /*-{
         if (!saved || !container || container.textContent !== saved.text) {
+            return;
+        }
+        var sel = $wnd.getSelection();
+        if (sel.rangeCount > 0 && !sel.isCollapsed
+                && sel.toString() === saved.selected) {
+            // The browser kept the selection: leave it alone
             return;
         }
         var locate = function(target) {
@@ -1483,7 +1497,6 @@ public class WidgetUtil {
         var range = $doc.createRange();
         range.setStart(start.node, start.offset);
         range.setEnd(end.node, end.offset);
-        var sel = $wnd.getSelection();
         if (sel.rangeCount > 0) {
             var current = sel.getRangeAt(0);
             if (current.startContainer === range.startContainer
