@@ -1,6 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: I01, remove the select-all header click handler with the selection column (from Vaadin 8 89fd72ed); I15, add columns at the visible index when columns are hidden (written for the fork); M03, column hiding toggle caption as text (written for the fork).
+ * Modified by LuxLabs in 2026: I15, add columns at the visible index when columns are hidden (written for the fork); M03, column hiding toggle caption as text (written for the fork).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -2938,7 +2938,6 @@ public class Grid<T> extends ResizeComposite implements HasSelectionHandlers<T>,
         private boolean selected = false;
         private CheckBox selectAllCheckBox;
         private boolean userSelectionAllowed = true;
-        private HandlerRegistration headerClickHandler;
         private boolean enabled = true;
 
         SelectionColumn(final Renderer<Boolean> selectColumnRenderer) {
@@ -2993,28 +2992,24 @@ public class Grid<T> extends ResizeComposite implements HasSelectionHandlers<T>,
                         });
                 selectAllCheckBox.setValue(selected);
 
-                headerClickHandler = addHeaderClickHandler(
-                        new HeaderClickHandler() {
-                            @Override
-                            public void onClick(GridClickEvent event) {
-                                if (!userSelectionAllowed) {
-                                    return;
-                                }
+                addHeaderClickHandler(new HeaderClickHandler() {
+                    @Override
+                    public void onClick(GridClickEvent event) {
+                        if (!userSelectionAllowed) {
+                            return;
+                        }
 
-                                CellReference<?> targetCell = event
-                                        .getTargetCell();
-                                int defaultRowIndex = getHeader().getRows()
-                                        .indexOf(getDefaultHeaderRow());
+                        CellReference<?> targetCell = event.getTargetCell();
+                        int defaultRowIndex = getHeader().getRows()
+                                .indexOf(getDefaultHeaderRow());
 
-                                if (targetCell.getColumnIndex() == 0
-                                        && targetCell
-                                                .getRowIndex() == defaultRowIndex) {
-                                    selectAllCheckBox.setValue(
-                                            !selectAllCheckBox.getValue(),
-                                            true);
-                                }
-                            }
-                        });
+                        if (targetCell.getColumnIndex() == 0 && targetCell
+                                .getRowIndex() == defaultRowIndex) {
+                            selectAllCheckBox.setValue(
+                                    !selectAllCheckBox.getValue(), true);
+                        }
+                    }
+                });
 
                 // Select all with space when "select all" cell is active
                 addHeaderKeyUpHandler(new HeaderKeyUpHandler() {
@@ -3152,13 +3147,6 @@ public class Grid<T> extends ResizeComposite implements HasSelectionHandlers<T>,
             // Re-render select checkboxes
             getEscalator().getBody().refreshRows(0,
                     getEscalator().getBody().getRowCount());
-        }
-
-        private void cleanup() {
-            if (headerClickHandler != null) {
-                headerClickHandler.removeHandler();
-                headerClickHandler = null;
-            }
         }
     }
 
@@ -7950,10 +7938,6 @@ public class Grid<T> extends ResizeComposite implements HasSelectionHandlers<T>,
             final Renderer<Boolean> selectColumnRenderer) {
         if (this.selectColumnRenderer == selectColumnRenderer) {
             return;
-        }
-
-        if (this.selectionColumn != null) {
-            selectionColumn.cleanup();
         }
 
         if (this.selectColumnRenderer != null) {
