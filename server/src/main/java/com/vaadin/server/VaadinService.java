@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M01/I18 (CVE-2021-31403, from Vaadin 8 7cb91b3b99); M16/I43 (no-store headers, from Vaadin 8 a30f74592a); I23 (session lock, from Vaadin 8 d5067d6bbd); I56 (403 for expired session, from Vaadin 8 477e9fe824).
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at

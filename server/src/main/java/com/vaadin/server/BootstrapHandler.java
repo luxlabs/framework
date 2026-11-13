@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M15/I54 (no bootstrap page for /VAADIN paths), written by LuxLabs; M08-M10/I27 (jsoup 1.24.1 constructors).
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at

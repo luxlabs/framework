@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M03/I06 (CVE-2019-25028, from Vaadin 8 4014f806a1 and 2584e9ad44, hardened by LuxLabs).
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at

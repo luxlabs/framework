@@ -1,3 +1,6 @@
+/*
+ * Modified by LuxLabs in 2026: I27 (adapted to jsoup 1.24.1).
+ */
 package com.vaadin.tests.design;
 
 import static org.junit.Assert.assertEquals;

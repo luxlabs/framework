@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M14/I30 (no directories as static files, from Vaadin 8 f70bc4269c, rewritten for Java 6); M16/I43 (no-store headers, from Vaadin 8 a30f74592a).
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
