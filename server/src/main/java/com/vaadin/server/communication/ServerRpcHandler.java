@@ -250,7 +250,11 @@ public class ServerRpcHandler implements Serializable {
             throws IOException, InvalidUIDLSecurityKeyException {
         ui.getSession().setLastRequestTimestamp(System.currentTimeMillis());
 
-        String changeMessage = getMessage(reader, getMaxRequestBodySize(ui));
+        // The protected hook getMessage(Reader) is called as in 7.7.17; the
+        // size limit (M17) applies to the reader that it receives
+        long maxSize = getMaxRequestBodySize(ui);
+        String changeMessage = getMessage(
+                maxSize < 0 ? reader : new SizeLimitedReader(reader, maxSize));
 
         if (changeMessage == null || changeMessage.equals("")) {
             // The client sometimes sends empty messages, this is probably a bug
@@ -646,25 +650,6 @@ public class ServerRpcHandler implements Serializable {
     }
 
     protected String getMessage(Reader reader) throws IOException {
-        return getMessage(reader, -1);
-    }
-
-    /**
-     * Reads the full request body into a string, up to a maximum size.
-     *
-     * @param reader
-     *            the reader of the request body
-     * @param maxSize
-     *            the maximum number of characters to accept, or -1 for no
-     *            limit
-     * @return the request body
-     * @throws IOException
-     *             if reading fails or the body exceeds the maximum size, in
-     *             which case it is not read further
-     * @since 7.7.17.1
-     */
-    protected String getMessage(Reader reader, long maxSize)
-            throws IOException {
 
         StringBuilder sb = new StringBuilder(MAX_BUFFER_SIZE);
         char[] buffer = new char[MAX_BUFFER_SIZE];
@@ -674,15 +659,53 @@ public class ServerRpcHandler implements Serializable {
             if (read == -1) {
                 break;
             }
-            if (maxSize >= 0 && sb.length() + (long) read > maxSize) {
-                throw new IOException("The request body exceeds the maximum size of "
-                        + maxSize + " characters (parameter "
-                        + MAX_REQUEST_BODY_SIZE_PARAMETER + ")");
-            }
             sb.append(buffer, 0, read);
         }
 
         return sb.toString();
+    }
+
+    /**
+     * Reader that fails as soon as more than a maximum number of characters
+     * is read from it, without reading further (M17).
+     */
+    private static class SizeLimitedReader extends Reader {
+        private final Reader in;
+        private final long maxSize;
+        private long count;
+
+        SizeLimitedReader(Reader in, long maxSize) {
+            this.in = in;
+            this.maxSize = maxSize;
+        }
+
+        @Override
+        public int read(char[] cbuf, int off, int len) throws IOException {
+            if (count > maxSize) {
+                throw exceeded();
+            }
+            // read at most one character beyond the limit, to detect it
+            int n = in.read(cbuf, off, (int) Math.min(len, maxSize - count + 1));
+            if (n > 0) {
+                count += n;
+                if (count > maxSize) {
+                    throw exceeded();
+                }
+            }
+            return n;
+        }
+
+        private IOException exceeded() {
+            return new IOException(
+                    "The request body exceeds the maximum size of " + maxSize
+                            + " characters (parameter "
+                            + MAX_REQUEST_BODY_SIZE_PARAMETER + ")");
+        }
+
+        @Override
+        public void close() throws IOException {
+            in.close();
+        }
     }
 
     /**
