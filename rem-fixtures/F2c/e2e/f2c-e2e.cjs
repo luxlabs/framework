@@ -284,6 +284,26 @@ function gridSelect(id) {
   };
 }
 
+// M03 (client side): the column hiding toggles show their captions as text.
+async function gridToggles(page, d) {
+  await page.click('#grid-toggles .v-grid-sidebar-button');
+  await page.waitForSelector('.column-hiding-toggle', { timeout: 5000 });
+  await sleep(1000);
+  const r = await page.evaluate(() => {
+    const toggles = Array.from(document.querySelectorAll('.column-hiding-toggle'));
+    return {
+      toggles: toggles.length,
+      markup: toggles.reduce((n, t) => n + t.querySelectorAll('img, b, .f2c-toggle-img, .f2c-toggle-b').length, 0),
+      texts: toggles.map((t) => t.textContent.trim()),
+      anywhere: document.querySelectorAll('.f2c-toggle-img, .f2c-toggle-b').length,
+      xss: window.f2cToggleXss === undefined ? 'undefined' : String(window.f2cToggleXss),
+    };
+  });
+  d.push(JSON.stringify(r));
+  return r.toggles === 3 && r.markup === 0 && r.anywhere === 0 && r.xss === 'undefined'
+    && r.texts.filter((t) => t.includes('<img class="f2c-toggle-img"')).length === 2;
+}
+
 // I01: sorting works after enabling and disabling multi-selection twice.
 async function gridSort(page, d) {
   for (const [button, line] of [['#mode-multi', 'mode=multi'], ['#mode-none', 'mode=none'], ['#mode-multi', 'mode=multi'], ['#mode-none', 'mode=none']]) {
@@ -356,6 +376,7 @@ async function responsive(page, d, logs) {
     await scenario(browser, 'i10-table-select', 'I10', RG, null, 'table', tableSelect);
     await scenario(browser, 'i46-grid-select-none', 'I46', REPRO, null, 'grid', gridSelect('grid-text-none'));
     await scenario(browser, 'i46-grid-select-single', 'I46', REPRO, null, 'grid', gridSelect('grid-text-single'));
+    await scenario(browser, 'm03-grid-toggles', 'M03', RG, null, 'grid', gridToggles);
     await scenario(browser, 'i01-grid-sort', 'I01', RES, null, 'grid', gridSort);
     await scenario(browser, 'i15-grid-add-column', 'I15', RG, null, 'grid', gridAddColumn);
     await scenario(browser, 'i55-responsive', 'I55', RG, null, 'responsive', responsive);

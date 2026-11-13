@@ -27,12 +27,15 @@ import com.vaadin.ui.Grid.SelectionMode;
 import com.vaadin.ui.UI;
 
 /**
- * Grid scenarios: I01 (sorting after enabling and disabling multi-selection
- * twice), I15 (adding a column when a column is hidden), I46 (text selection
+ * Grid scenarios: M03 (column hiding toggle captions), I01 (sorting after
+ * enabling and disabling multi-selection twice), I15 (adding a column when a column is hidden), I46 (text selection
  * in a cell, reproduction).
  */
 @Theme("valo")
 public class GridUI extends UI {
+
+    /** M03: header and hiding toggle captions with markup. */
+    static final String TOGGLE_HOSTILE = "<img class=\"f2c-toggle-img\" src=\"x\" onerror=\"window.f2cToggleXss=1\"><b class=\"f2c-toggle-b\">bold</b>";
 
     @Override
     protected void init(VaadinRequest request) {
@@ -96,6 +99,21 @@ public class GridUI extends UI {
         });
         add.setId("add-column");
         root.addComponent(add);
+
+        final Grid toggles = new Grid();
+        toggles.setId("grid-toggles");
+        toggles.setWidth("500px");
+        toggles.setHeight("200px");
+        toggles.addColumn("x", String.class);
+        toggles.addColumn("y", String.class);
+        toggles.addColumn("z", String.class);
+        toggles.addRow("x1", "y1", "z1");
+        toggles.getColumn("x").setHeaderCaption(TOGGLE_HOSTILE)
+                .setHidable(true);
+        toggles.getColumn("y").setHidingToggleCaption(TOGGLE_HOSTILE)
+                .setHidable(true);
+        toggles.getColumn("z").setHidable(true);
+        root.addComponent(toggles);
 
         for (SelectionMode mode : new SelectionMode[] { SelectionMode.NONE,
                 SelectionMode.SINGLE }) {

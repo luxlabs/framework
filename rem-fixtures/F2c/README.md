@@ -10,6 +10,7 @@ Not part of the Vaadin reactor. Chromium checks of the F2c client side items, ru
 | Scenario | Item | Expectation |
 | --- | --- | --- |
 | `i05-panel` | I05/M04 | red on base, green on candidate |
+| `m03-grid-toggles` | M03 (client side) | red on base, green on candidate |
 | `i02-keyboard` | I02 (Chromium) | green on both: key down navigation unchanged on Chromium |
 | `i03-autocomplete` | I03 | red on base, green on candidate |
 | `i44-popup-left`, `i40-popup-positions`, `i01-grid-sort` | I44, I40, I01 | red on base, green on candidate; corrections kept only if the base is red |
