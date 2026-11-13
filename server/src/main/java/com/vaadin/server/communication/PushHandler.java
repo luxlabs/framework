@@ -21,6 +21,7 @@ import java.io.Reader;
 import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.util.Collection;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -45,6 +46,7 @@ import com.vaadin.server.VaadinSession;
 import com.vaadin.shared.ApplicationConstants;
 import com.vaadin.shared.communication.PushMode;
 import com.vaadin.ui.UI;
+import com.vaadin.util.CurrentInstance;
 
 import elemental.json.JsonException;
 
@@ -312,6 +314,20 @@ public class PushHandler {
     }
 
     void connectionLost(AtmosphereResourceEvent event) {
+        // The lookups below set the current session and UI in the thread
+        // locals of the calling (Atmosphere) thread: restore what the thread
+        // had before, so that they do not leak (I19)
+        Map<Class<?>, CurrentInstance> oldInstances = CurrentInstance
+                .getInstances(false);
+        try {
+            handleConnectionLost(event);
+        } finally {
+            CurrentInstance.clearAll();
+            CurrentInstance.restoreInstances(oldInstances);
+        }
+    }
+
+    private void handleConnectionLost(AtmosphereResourceEvent event) {
         // We don't want to use callWithUi here, as it assumes there's a client
         // request active and does requestStart and requestEnd among other
         // things.
