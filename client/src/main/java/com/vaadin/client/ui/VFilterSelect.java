@@ -1,6 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f); I44, popup position with the menu margin, border and padding (from Vaadin 8 f1dc01ec); I40, fewer popup position resets (from Vaadin 8 a8310a63).
+ * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f); I40, fewer popup position resets (from Vaadin 8 a8310a63, without the menu padding term of f1dc01ec).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -818,8 +818,6 @@ public class VFilterSelect extends Composite
 
             updateMenuWidth(desiredWidth, naturalMenuWidth);
 
-            double menuMarginBorderPaddingWidth = getMarginBorderPaddingWidth(
-                    menu.getElement());
             if (BrowserInfo.get().isIE()
                     && BrowserInfo.get().getBrowserMajorVersion() < 11) {
                 // Must take margin,border,padding manually into account for
@@ -834,13 +832,15 @@ public class VFilterSelect extends Composite
                             .getStyle().getVisibility();
                     menu.getElement().getParentElement().getStyle()
                             .setVisibility(Visibility.VISIBLE);
-                    naturalMenuOuterWidth = WidgetUtil.getRequiredWidthDouble(
-                            menuFirstChild) + menuMarginBorderPaddingWidth;
+                    naturalMenuOuterWidth = WidgetUtil
+                            .getRequiredWidthDouble(menuFirstChild)
+                            + getMarginBorderPaddingWidth(menu.getElement());
                     menu.getElement().getParentElement().getStyle()
                             .setProperty("visibility", before);
                 } else {
-                    naturalMenuOuterWidth = WidgetUtil.getRequiredWidthDouble(
-                            menuFirstChild) + menuMarginBorderPaddingWidth;
+                    naturalMenuOuterWidth = WidgetUtil
+                            .getRequiredWidthDouble(menuFirstChild)
+                            + getMarginBorderPaddingWidth(menu.getElement());
                 }
 
                 /*
@@ -912,20 +912,17 @@ public class VFilterSelect extends Composite
                 }
             }
 
-            if (offsetWidth + menuMarginBorderPaddingWidth
-                    + left < VFilterSelect.this.getAbsoluteLeft()
-                            + VFilterSelect.this.getOffsetWidth()) {
+            if (offsetWidth + left < VFilterSelect.this.getAbsoluteLeft()
+                    + VFilterSelect.this.getOffsetWidth()) {
                 // Popup doesn't reach all the way to the end of the input
                 // field, filtering may have changed the popup width.
                 left = VFilterSelect.this.getAbsoluteLeft();
             }
-            if (offsetWidth + menuMarginBorderPaddingWidth + left > Window
-                    .getClientWidth()) {
+            if (offsetWidth + left > Window.getClientWidth()) {
                 // Popup doesn't fit the view, needs to be opened to the left
                 // instead.
                 left = VFilterSelect.this.getAbsoluteLeft()
-                        + VFilterSelect.this.getOffsetWidth() - offsetWidth
-                        - (int) menuMarginBorderPaddingWidth;
+                        + VFilterSelect.this.getOffsetWidth() - offsetWidth;
                 if (BrowserInfo.get().isIE()
                         && BrowserInfo.get().getBrowserMajorVersion() < 10) {
                     setTdWidth(menu.getElement(), Window.getClientWidth() - 8);
