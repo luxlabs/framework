@@ -1,6 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f); I03, autocomplete off also for Chromium user agents not detected as Chrome (written for the fork).
+ * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f); I03, autocomplete off also for Chromium user agents not detected as Chrome (written for the fork); I46, save and restore a text selection (written for the fork).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -1392,6 +1392,109 @@ public class WidgetUtil {
             e.onselectstart = null;
             e.style.webkitUserSelect = "text";
         }
+    }-*/;
+
+    /**
+     * Saves the text selection of the document if it starts and ends inside
+     * the given element and is not empty, as character offsets in the text of
+     * the element.
+     * <p>
+     * For internal use only. May be removed or replaced in the future.
+     *
+     * @param container
+     *            the element
+     * @return the saved selection, or {@code null} if there is nothing to save
+     * @since 7.7.17.1
+     */
+    public static native JavaScriptObject saveTextSelection(Element container)
+    /*-{
+        if (!container || !$wnd.getSelection || !$doc.createRange) {
+            return null;
+        }
+        var sel = $wnd.getSelection();
+        if (!sel || sel.rangeCount == 0 || sel.isCollapsed) {
+            return null;
+        }
+        var range = sel.getRangeAt(0);
+        var inside = function(node) {
+            while (node) {
+                if (node === container) {
+                    return true;
+                }
+                node = node.parentNode;
+            }
+            return false;
+        };
+        if (!inside(range.startContainer) || !inside(range.endContainer)) {
+            return null;
+        }
+        var offset = function(node, nodeOffset) {
+            var before = $doc.createRange();
+            before.setStart(container, 0);
+            before.setEnd(node, nodeOffset);
+            return before.toString().length;
+        };
+        return {
+            start: offset(range.startContainer, range.startOffset),
+            end: offset(range.endContainer, range.endOffset),
+            text: container.textContent
+        };
+    }-*/;
+
+    /**
+     * Restores a text selection saved with
+     * {@link #saveTextSelection(Element)}, if the text of the element has not
+     * changed.
+     * <p>
+     * For internal use only. May be removed or replaced in the future.
+     *
+     * @param container
+     *            the element
+     * @param saved
+     *            the saved selection, may be {@code null}
+     * @since 7.7.17.1
+     */
+    public static native void restoreTextSelection(Element container,
+            JavaScriptObject saved)
+    /*-{
+        if (!saved || !container || container.textContent !== saved.text) {
+            return;
+        }
+        var locate = function(target) {
+            var walker = $doc.createTreeWalker(container, 4, null, false);
+            var seen = 0;
+            var node;
+            var last = null;
+            while ((node = walker.nextNode())) {
+                var length = node.nodeValue.length;
+                if (target <= seen + length) {
+                    return { node: node, offset: target - seen };
+                }
+                seen += length;
+                last = node;
+            }
+            return last ? { node: last, offset: last.nodeValue.length } : null;
+        };
+        var start = locate(saved.start);
+        var end = locate(saved.end);
+        if (!start || !end) {
+            return;
+        }
+        var range = $doc.createRange();
+        range.setStart(start.node, start.offset);
+        range.setEnd(end.node, end.offset);
+        var sel = $wnd.getSelection();
+        if (sel.rangeCount > 0) {
+            var current = sel.getRangeAt(0);
+            if (current.startContainer === range.startContainer
+                    && current.startOffset === range.startOffset
+                    && current.endContainer === range.endContainer
+                    && current.endOffset === range.endOffset) {
+                return;
+            }
+        }
+        sel.removeAllRanges();
+        sel.addRange(range);
     }-*/;
 
     /**

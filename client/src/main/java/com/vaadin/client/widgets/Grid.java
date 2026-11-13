@@ -1,6 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: I15, add columns at the visible index when columns are hidden (written for the fork); M03, column hiding toggle caption as text (written for the fork).
+ * Modified by LuxLabs in 2026: I15, add columns at the visible index when columns are hidden (written for the fork); M03, column hiding toggle caption as text (written for the fork); I46, keep the text selection when a body row is re-rendered (written for the fork).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -32,6 +32,7 @@ import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.google.gwt.core.client.JavaScriptObject;
 import com.google.gwt.core.client.Scheduler;
 import com.google.gwt.core.client.Scheduler.ScheduledCommand;
 import com.google.gwt.core.shared.GWT;
@@ -2697,9 +2698,13 @@ public class Grid<T> extends ResizeComposite implements HasSelectionHandlers<T>,
          */
         public void handleNavigationEvent(Event event, CellReference<T> cell) {
             if (event.getType().equals(BrowserEvents.CLICK)) {
+                // Keep a text selection made with the mouse (I46)
+                JavaScriptObject textSelection = WidgetUtil
+                        .saveTextSelection(getElement());
                 setCellFocus(cell);
                 // Grid should have focus when clicked.
                 getElement().focus();
+                WidgetUtil.restoreTextSelection(getElement(), textSelection);
             } else if (event.getType().equals(BrowserEvents.KEYDOWN)) {
                 int newRow = rowWithFocus;
                 RowContainer newContainer = containerWithFocus;
@@ -5600,6 +5605,23 @@ public class Grid<T> extends ResizeComposite implements HasSelectionHandlers<T>,
 
         @Override
         public void update(Row row, Iterable<FlyweightCell> cellsToUpdate) {
+            /*
+             * Re-rendering the cells replaces their text nodes and loses a text
+             * selection made by the user inside the row, for example when a
+             * click moves the cell focus or a server update refreshes the row:
+             * keep it (I46).
+             */
+            JavaScriptObject textSelection = WidgetUtil
+                    .saveTextSelection(row.getElement());
+            try {
+                updateRow(row, cellsToUpdate);
+            } finally {
+                WidgetUtil.restoreTextSelection(row.getElement(),
+                        textSelection);
+            }
+        }
+
+        private void updateRow(Row row, Iterable<FlyweightCell> cellsToUpdate) {
             int rowIndex = row.getRow();
             TableRowElement rowElement = row.getElement();
             T rowData = dataSource.getRow(rowIndex);
