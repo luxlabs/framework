@@ -1,6 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: I02, key down navigation on Firefox 65+ (from Vaadin 8 47711930).
+ * Modified by LuxLabs in 2026: I02, key down navigation on Firefox 65+ (from Vaadin 8 47711930); I10, text selection in Chrome (from Vaadin 8 38b7419f).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -6337,15 +6337,15 @@ public class VScrollTable extends FlowPanel
 
                         if (targetCellOrRowFound) {
                             setRowFocus(this);
-                            ensureFocus();
                             if (dragmode != 0 && (event
                                     .getButton() == NativeEvent.BUTTON_LEFT)) {
+                                ensureFocus();
                                 startRowDrag(event, type, targetTdOrTr);
 
                             } else if (event.getCtrlKey() || event.getShiftKey()
                                     || event.getMetaKey()
                                             && isMultiSelectModeDefault()) {
-
+                                ensureFocus();
                                 // Prevent default text selection in Firefox
                                 event.preventDefault();
 
