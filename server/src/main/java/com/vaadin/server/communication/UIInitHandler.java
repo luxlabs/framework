@@ -107,15 +107,9 @@ public abstract class UIInitHandler extends SynchronizedRequestHandler {
         // The response was produced without errors so write it to the client
         response.setContentType(JsonConstants.JSON_CONTENT_TYPE);
 
-        // Response might contain sensitive information, so prevent caching
-        // no-store to disallow storing even if cache would be revalidated
-        // must-revalidate to not use stored value even if someone asks for it
-        response.setHeader("Cache-Control",
-                "no-cache, no-store, must-revalidate");
-
-        // Also set legacy values in case of old proxies in between
-        response.setHeader("Pragma", "no-cache");
-        response.setHeader("Expires", "0");
+        // Response might contain sensitive information, so prevent all forms of
+        // caching
+        VaadinService.setNoCacheHeaders(response);
 
         byte[] b = json.getBytes("UTF-8");
         response.setContentLength(b.length);
