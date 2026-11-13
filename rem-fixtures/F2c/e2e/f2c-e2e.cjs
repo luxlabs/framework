@@ -270,9 +270,16 @@ async function tableSelect(page, d) {
 }
 
 // I46: text selection inside one Grid cell survives and stays in the cell.
+// The cell is scrolled into view first (the mouse works in viewport
+// coordinates) and is not the cell focused by default (row 1, column 1), so
+// that the click ending the selection moves the cell focus.
 function gridSelect(id) {
   return async (page, d) => {
-    const cell = `#${id} .v-grid-body .v-grid-row:nth-child(1) .v-grid-cell:nth-child(1)`;
+    const cell = `#${id} .v-grid-body .v-grid-row:nth-child(2) .v-grid-cell:nth-child(1)`;
+    await page.$eval(cell, (e) => e.scrollIntoView({ block: 'center' }));
+    await sleep(500);
+    const inView = await page.$eval(cell, (e) => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight; });
+    d.push(`cell in view=${inView}`);
     const text = await dragSelect(page, cell);
     const sel1 = await selection(page);
     await sleep(1000);
