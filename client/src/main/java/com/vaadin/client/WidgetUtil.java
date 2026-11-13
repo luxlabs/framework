@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -44,6 +45,7 @@ import com.google.gwt.user.client.Event;
 import com.google.gwt.user.client.EventListener;
 import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.ui.RootPanel;
+import com.google.gwt.user.client.ui.TextBox;
 import com.google.gwt.user.client.ui.Widget;
 import com.vaadin.shared.ui.ErrorLevel;
 import com.vaadin.shared.util.SharedUtil;
@@ -1931,6 +1933,37 @@ public class WidgetUtil {
                     element.removeClassName(className);
                 }
             }
+        }
+    }
+
+    /**
+     * Stops the browser from showing its own suggestion popup for the given
+     * text box.
+     * <p>
+     * For internal use only. May be removed or replaced in the future.
+     *
+     * @param textBox
+     *            the text box, not {@code null}
+     * @since 7.7.17.1
+     */
+    public static void disableBrowserAutocomplete(TextBox textBox) {
+        /*-
+         * Stop the browser from showing its own suggestion popup.
+         *
+         * Using an invalid value instead of "off" as suggested by
+         * https://developer.mozilla.org/en-US/docs/Web/Security/Securing_your_site/Turning_off_form_autocompletion
+         *
+         * Leaving the non-standard Safari options autocapitalize and
+         * autocorrect untouched since those do not interfere in the same
+         * way, and they might be useful in a combo box where new items are
+         * allowed.
+         */
+        if (BrowserInfo.get().isChrome()) {
+            // Chrome supports "off" and the invalid value does not work with
+            // Chrome
+            textBox.getElement().setAttribute("autocomplete", "off");
+        } else {
+            textBox.getElement().setAttribute("autocomplete", "nope");
         }
     }
 }

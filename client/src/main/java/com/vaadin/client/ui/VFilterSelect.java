@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -1405,18 +1406,8 @@ public class VFilterSelect extends Composite
          * @since 7.6.4
          */
         public FilterSelectTextBox() {
-            /*-
-             * Stop the browser from showing its own suggestion popup.
-             *
-             * Using an invalid value instead of "off" as suggested by
-             * https://developer.mozilla.org/en-US/docs/Web/Security/Securing_your_site/Turning_off_form_autocompletion
-             *
-             * Leaving the non-standard Safari options autocapitalize and
-             * autocorrect untouched since those do not interfere in the same
-             * way, and they might be useful in a combo box where new items are
-             * allowed.
-             */
-            getElement().setAttribute("autocomplete", "nope");
+            // Stop the browser from showing its own suggestion popup.
+            WidgetUtil.disableBrowserAutocomplete(this);
         }
 
         /**
