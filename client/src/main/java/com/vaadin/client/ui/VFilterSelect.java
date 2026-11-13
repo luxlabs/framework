@@ -1,6 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f).
+ * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f); I44, popup position with the menu margin, border and padding (from Vaadin 8 f1dc01ec).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -812,6 +812,8 @@ public class VFilterSelect extends Composite
 
             updateMenuWidth(desiredWidth, naturalMenuWidth);
 
+            double menuMarginBorderPaddingWidth = getMarginBorderPaddingWidth(
+                    menu.getElement());
             if (BrowserInfo.get().isIE()
                     && BrowserInfo.get().getBrowserMajorVersion() < 11) {
                 // Must take margin,border,padding manually into account for
@@ -826,15 +828,13 @@ public class VFilterSelect extends Composite
                             .getStyle().getVisibility();
                     menu.getElement().getParentElement().getStyle()
                             .setVisibility(Visibility.VISIBLE);
-                    naturalMenuOuterWidth = WidgetUtil
-                            .getRequiredWidthDouble(menuFirstChild)
-                            + getMarginBorderPaddingWidth(menu.getElement());
+                    naturalMenuOuterWidth = WidgetUtil.getRequiredWidthDouble(
+                            menuFirstChild) + menuMarginBorderPaddingWidth;
                     menu.getElement().getParentElement().getStyle()
                             .setProperty("visibility", before);
                 } else {
-                    naturalMenuOuterWidth = WidgetUtil
-                            .getRequiredWidthDouble(menuFirstChild)
-                            + getMarginBorderPaddingWidth(menu.getElement());
+                    naturalMenuOuterWidth = WidgetUtil.getRequiredWidthDouble(
+                            menuFirstChild) + menuMarginBorderPaddingWidth;
                 }
 
                 /*
@@ -906,9 +906,11 @@ public class VFilterSelect extends Composite
                 }
             }
 
-            if (offsetWidth + left > Window.getClientWidth()) {
+            if (offsetWidth + menuMarginBorderPaddingWidth + left > Window
+                    .getClientWidth()) {
                 left = VFilterSelect.this.getAbsoluteLeft()
-                        + VFilterSelect.this.getOffsetWidth() - offsetWidth;
+                        + VFilterSelect.this.getOffsetWidth() - offsetWidth
+                        - (int) menuMarginBorderPaddingWidth;
                 if (left < 0) {
                     left = 0;
                     menu.setWidth(Window.getClientWidth() + "px");
