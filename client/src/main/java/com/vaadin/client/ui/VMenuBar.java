@@ -131,11 +131,45 @@ public class VMenuBar extends SimpleFocusablePanel
          * handler, other browsers handle it correctly when using a key down
          * handler
          */
-        if (BrowserInfo.get().isGecko()) {
+        if (useOldGeckoNavigation()) {
             addKeyPressHandler(this);
         } else {
             addKeyDownHandler(this);
         }
+    }
+
+    /**
+     * Tells whether keyboard navigation must use a key press handler instead
+     * of a key down handler in the current browser. Used by the widgets with
+     * keyboard navigation (MenuBar, Slider, DateField calendar, Tree, Table).
+     * <p>
+     * For internal use only. May be removed or replaced in the future.
+     *
+     * @return {@code true} to use a key press handler, {@code false} to use a
+     *         key down handler
+     */
+    static boolean useOldGeckoNavigation() {
+        BrowserInfo browserInfo = BrowserInfo.get();
+        return isOldGeckoNavigation(browserInfo.isGecko(),
+                browserInfo.getGeckoVersion());
+    }
+
+    /**
+     * Firefox auto-repeat works correctly only if we use a key press
+     * handler, other browsers handle it correctly when using a key down
+     * handler.
+     * <p>
+     * For internal use only. May be removed or replaced in the future.
+     *
+     * @param gecko
+     *            {@code true} if the browser is Gecko based
+     * @param geckoVersion
+     *            the Gecko version, see {@link BrowserInfo#getGeckoVersion()}
+     * @return {@code true} to use a key press handler, {@code false} to use a
+     *         key down handler
+     */
+    static boolean isOldGeckoNavigation(boolean gecko, float geckoVersion) {
+        return gecko;
     }
 
     public VMenuBar(boolean subMenu, VMenuBar parentMenu) {

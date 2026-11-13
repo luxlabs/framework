@@ -52,7 +52,6 @@ import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.InlineHTML;
 import com.google.gwt.user.client.ui.ListBox;
 import com.google.gwt.user.client.ui.Widget;
-import com.vaadin.client.BrowserInfo;
 import com.vaadin.client.DateTimeService;
 import com.vaadin.client.WidgetUtil;
 import com.vaadin.client.VConsole;
@@ -215,7 +214,7 @@ public class VCalendarPanel extends FocusableFlexTable implements
          * handler, other browsers handle it correctly when using a key down
          * handler
          */
-        if (BrowserInfo.get().isGecko()) {
+        if (VMenuBar.useOldGeckoNavigation()) {
             addKeyPressHandler(this);
         } else {
             addKeyDownHandler(this);

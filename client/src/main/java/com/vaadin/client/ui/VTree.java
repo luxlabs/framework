@@ -213,7 +213,7 @@ public class VTree extends FocusElementPanel
          * handler, other browsers handle it correctly when using a key down
          * handler
          */
-        if (BrowserInfo.get().isGecko()) {
+        if (VMenuBar.useOldGeckoNavigation()) {
             addKeyPressHandler(this);
         } else {
             addKeyDownHandler(this);
