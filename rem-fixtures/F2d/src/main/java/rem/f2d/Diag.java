@@ -46,6 +46,12 @@ public final class Diag {
 
     private static final Map<String, List<String>> LINES = new ConcurrentHashMap<String, List<String>>();
     private static final List<String> EVENTS = new ArrayList<String>();
+    /**
+     * Strong references: java.util.logging keeps loggers only weakly, and a
+     * collected logger loses its level and handler (it happened in the run
+     * 20261113-232623, where no PushHandler record was captured).
+     */
+    private static final List<Logger> CAPTURED = new ArrayList<Logger>();
 
     /** Records a global event (Atmosphere or Vaadin log), with its time. */
     public static void event(String text) {
@@ -92,6 +98,7 @@ public final class Diag {
             Logger logger = Logger.getLogger(name);
             logger.setLevel(Level.FINEST);
             logger.addHandler(handler);
+            CAPTURED.add(logger);
         }
     }
 
