@@ -160,6 +160,31 @@
     <build>
         <plugins>
             <plugin>
+                <!-- jsoup 1.24.1 (I27): the jar is multi-release with Java 11
+                    classes, which animal-sniffer 1.15 cannot read, so it is
+                    left out of the scanned dependencies and its classes are
+                    ignored; it takes a java.util.function.Consumer to
+                    customize tags. vaadin-server requires Java 8 at runtime
+                    with it (I57). The check of the JDK API used by Vaadin
+                    itself stays at Java 6. -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>animal-sniffer-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>java6compatibility</id>
+                        <configuration>
+                            <excludeDependencies>
+                                <excludeDependency>org.jsoup:jsoup</excludeDependency>
+                            </excludeDependencies>
+                            <ignores>
+                                <ignore>org.jsoup.*</ignore>
+                                <ignore>java.util.function.Consumer</ignore>
+                            </ignores>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <artifactId>maven-resources-plugin</artifactId>
                 <executions>
                     <!-- Copy .java files to package -->
@@ -229,7 +254,8 @@
                 <extensions>true</extensions>
                 <configuration>
                     <instructions>
-                        <Bundle-RequiredExecutionEnvironment>JavaSE-1.6</Bundle-RequiredExecutionEnvironment>
+                        <!-- jsoup 1.24.1 requires Java 8 at runtime (I57) -->
+                        <Bundle-RequiredExecutionEnvironment>JavaSE-1.8</Bundle-RequiredExecutionEnvironment>
                         <Bundle-Version>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}</Bundle-Version>
                         <Export-Package>VAADIN;version=${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion},com.vaadin.*;version="${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}"</Export-Package>
                         <Import-Package>javax.servlet;version="2.4",
