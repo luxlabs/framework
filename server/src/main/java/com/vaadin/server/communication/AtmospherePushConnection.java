@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: REM F2d I34, written for the fork (no Vaadin 8 source).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
