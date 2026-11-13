@@ -1,6 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f); I40, fewer popup position resets (from Vaadin 8 a8310a63, without the menu padding term of f1dc01ec).
+ * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f); I14, select or add the typed value when the field is left before the filtering response (written for the fork); I40, fewer popup position resets (from Vaadin 8 a8310a63, without the menu padding term of f1dc01ec).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -409,6 +409,16 @@ public class VFilterSelect extends Composite
 
             debug("VFS.SP: showSuggestions(" + currentSuggestions + ", "
                     + currentPage + ", " + totalSuggestions + ")");
+
+            if (!focused && textToHandleAfterBlur != null) {
+                // The field was left before the filtering response arrived:
+                // select or add the typed value instead of opening the popup
+                // of a field without focus (I14)
+                String typed = textToHandleAfterBlur;
+                textToHandleAfterBlur = null;
+                handleTextAfterBlur(typed, currentSuggestions);
+                return;
+            }
 
             /*
              * We need to defer the opening of the popup so that the parent DOM
@@ -1614,6 +1624,12 @@ public class VFilterSelect extends Composite
      */
     public boolean popupOpenerClicked;
 
+    /**
+     * Text typed in the field when it lost focus while a filtering response
+     * was pending, to be selected or added when the response arrives (I14).
+     */
+    private String textToHandleAfterBlur;
+
     /** For internal use only. May be removed or replaced in the future. */
     public int suggestionPopupMinWidth = 0;
 
@@ -1908,6 +1924,53 @@ public class VFilterSelect extends Composite
      * @param suggestion
      *            The suggestion that just got selected.
      */
+    /**
+     * Selects or adds the text typed before the field lost focus, once the
+     * filtering response for it has arrived (I14): an exact match is
+     * selected; otherwise a new item is added if allowed, else the first
+     * suggestion matching the text is selected, as the tab key does when the
+     * suggestion popup is open.
+     *
+     * @param typed
+     *            the text in the field when it lost focus
+     * @param suggestions
+     *            the suggestions of the filtering response
+     */
+    private void handleTextAfterBlur(String typed,
+            Collection<FilterSelectSuggestion> suggestions) {
+        for (FilterSelectSuggestion suggestion : suggestions) {
+            if (!"".equals(suggestion.key)
+                    && suggestion.getReplacementString().equals(typed)) {
+                onSuggestionSelected(suggestion);
+                return;
+            }
+        }
+        if (allowNewItem) {
+            if (!"".equals(typed) && !typed.equals(lastNewItemString)) {
+                lastNewItemString = typed;
+                setPromptingOff(typed);
+                client.updateVariable(paintableId, "newitem", typed,
+                        immediate);
+                afterUpdateClientVariables();
+            }
+            return;
+        }
+        if (filteringmode == FilteringMode.OFF || "".equals(typed)) {
+            return;
+        }
+        String filter = typed.toLowerCase();
+        for (FilterSelectSuggestion suggestion : suggestions) {
+            String caption = suggestion.getReplacementString().toLowerCase();
+            boolean matches = filteringmode == FilteringMode.CONTAINS
+                    ? caption.contains(filter)
+                    : caption.startsWith(filter);
+            if (!"".equals(suggestion.key) && matches) {
+                onSuggestionSelected(suggestion);
+                return;
+            }
+        }
+    }
+
     public void onSuggestionSelected(FilterSelectSuggestion suggestion) {
         if (enableDebug) {
             debug("VFS: onSuggestionSelected(" + suggestion.caption + ": "
@@ -2417,6 +2480,7 @@ public class VFilterSelect extends Composite
         }
 
         focused = true;
+        textToHandleAfterBlur = null;
         if (prompting && !readonly) {
             setPromptingOff("");
         }
@@ -2479,8 +2543,16 @@ public class VFilterSelect extends Composite
 
         focused = false;
         if (!readonly) {
-            if (textInputEnabled && allowNewItem) {
-                suggestionPopup.menu.doSelectedItemAction();
+            if (textInputEnabled && waitingForFilteringResponse && !prompting) {
+                // Typed fast and left the field: the filtering response has
+                // not arrived yet, handle the typed text when it arrives (I14)
+                textToHandleAfterBlur = tb.getText();
+                updateSelectionWhenReponseIsReceived = false;
+            } else {
+                textToHandleAfterBlur = null;
+                if (textInputEnabled && allowNewItem) {
+                    suggestionPopup.menu.doSelectedItemAction();
+                }
             }
             if (selectedOptionKey == null) {
                 if (explicitSelectedCaption != null) {
