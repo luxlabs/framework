@@ -175,7 +175,8 @@ public class ActionManager
                 final String akey = actionMapper.key(a);
                 paintTarget.addAttribute("key", akey);
                 if (a.getCaption() != null) {
-                    paintTarget.addAttribute("caption", a.getCaption());
+                    paintTarget.addAttribute("caption",
+                            a.getCaptionAsClientHtml());
                 }
                 if (a.getIcon() != null) {
                     paintTarget.addAttribute("icon", a.getIcon());

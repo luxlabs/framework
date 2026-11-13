@@ -42,6 +42,13 @@ public class Action implements Serializable {
     private Resource icon = null;
 
     /**
+     * Whether the caption is sent to the client as HTML. Defaults to
+     * <code>false</code>: the client renders action captions as HTML, so by
+     * default they are escaped (CVE-2025-15022).
+     */
+    private boolean captionAsHtml = false;
+
+    /**
      * Constructs a new action with the given caption.
      *
      * @param caption
@@ -176,6 +183,82 @@ public class Action implements Serializable {
          *            the handler to be removed.
          */
         public void removeActionHandler(Action.Handler actionHandler);
+    }
+
+    /**
+     * Sets whether the caption is sent to the client as HTML.
+     * <p>
+     * The client renders action captions (context menus of {@link
+     * com.vaadin.ui.Table} and {@link com.vaadin.ui.Tree}, shortcut actions)
+     * as HTML. By default (<code>false</code>) the caption is escaped before it
+     * is sent, so that it is shown as plain text. Set to <code>true</code>
+     * only when the caption is trusted HTML: the application is then
+     * responsible for sanitizing any user-provided content in it to prevent
+     * cross-site scripting.
+     *
+     * @param captionAsHtml
+     *            <code>true</code> to send the caption as HTML,
+     *            <code>false</code> to send it as plain text
+     * @since 7.7.17.1
+     */
+    public void setCaptionAsHtml(boolean captionAsHtml) {
+        this.captionAsHtml = captionAsHtml;
+    }
+
+    /**
+     * Returns whether the caption is sent to the client as HTML.
+     *
+     * @see #setCaptionAsHtml(boolean)
+     * @return <code>true</code> if the caption is sent as HTML,
+     *         <code>false</code> if it is sent as plain text (the default)
+     * @since 7.7.17.1
+     */
+    public boolean isCaptionAsHtml() {
+        return captionAsHtml;
+    }
+
+    /**
+     * Returns the caption in the form that is sent to the client, which
+     * renders it as HTML: the caption itself if {@link #isCaptionAsHtml()},
+     * otherwise the caption with the HTML special characters escaped. This
+     * method is used by the framework when painting actions.
+     *
+     * @return the caption as an HTML fragment, or <code>null</code> if the
+     *         caption is <code>null</code>
+     * @since 7.7.17.1
+     */
+    public String getCaptionAsClientHtml() {
+        if (caption == null || captionAsHtml) {
+            return caption;
+        }
+        return escapeHtml(caption);
+    }
+
+    private static String escapeHtml(String text) {
+        StringBuilder sb = new StringBuilder(text.length() + 16);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            switch (c) {
+            case '&':
+                sb.append("&amp;");
+                break;
+            case '<':
+                sb.append("&lt;");
+                break;
+            case '>':
+                sb.append("&gt;");
+                break;
+            case '"':
+                sb.append("&quot;");
+                break;
+            case '\'':
+                sb.append("&#39;");
+                break;
+            default:
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     /**

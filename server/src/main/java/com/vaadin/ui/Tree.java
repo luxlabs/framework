@@ -813,7 +813,7 @@ public class Tree extends AbstractSelect implements Container.Hierarchical,
                 target.startTag("action");
                 if (a.getCaption() != null) {
                     target.addAttribute(TreeConstants.ATTRIBUTE_ACTION_CAPTION,
-                            a.getCaption());
+                            a.getCaptionAsClientHtml());
                 }
                 if (a.getIcon() != null) {
                     target.addAttribute(TreeConstants.ATTRIBUTE_ACTION_ICON,

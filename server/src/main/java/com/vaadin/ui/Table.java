@@ -3626,7 +3626,7 @@ public class Table extends AbstractSelect implements Action.Container,
             for (Action a : actionSet) {
                 target.startTag("action");
                 if (a.getCaption() != null) {
-                    target.addAttribute("caption", a.getCaption());
+                    target.addAttribute("caption", a.getCaptionAsClientHtml());
                 }
                 if (a.getIcon() != null) {
                     target.addAttribute("icon", a.getIcon());
