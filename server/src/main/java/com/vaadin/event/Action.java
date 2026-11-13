@@ -221,8 +221,9 @@ public class Action implements Serializable {
 
     /**
      * Returns the caption in the form that is sent to the client, which
-     * renders it as HTML: the caption itself if {@link #isCaptionAsHtml()},
-     * otherwise the caption with the HTML special characters escaped. This
+     * renders it as HTML: the value of {@link #getCaption()} itself if
+     * {@link #isCaptionAsHtml()}, otherwise that value with the HTML special
+     * characters escaped. This
      * method is used by the framework when painting actions.
      *
      * @return the caption as an HTML fragment, or <code>null</code> if the
@@ -230,10 +231,13 @@ public class Action implements Serializable {
      * @since 7.7.17.1
      */
     public String getCaptionAsClientHtml() {
-        if (caption == null || captionAsHtml) {
-            return caption;
+        // through the overridable getters, so that a subclass that computes
+        // its caption (or its HTML policy) is honored, as in 7.7.17
+        String value = getCaption();
+        if (value == null || isCaptionAsHtml()) {
+            return value;
         }
-        return escapeHtml(caption);
+        return escapeHtml(value);
     }
 
     private static String escapeHtml(String text) {
