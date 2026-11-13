@@ -27,6 +27,8 @@ import com.vaadin.event.Action;
 import com.vaadin.event.ShortcutAction;
 import com.vaadin.server.PaintException;
 import com.vaadin.server.PaintTarget;
+import com.vaadin.shared.ui.calendar.CalendarState;
+import com.vaadin.ui.Calendar;
 import com.vaadin.ui.Panel;
 import com.vaadin.ui.Table;
 import com.vaadin.ui.Tree;
@@ -40,7 +42,8 @@ import com.vaadin.util.CurrentInstance;
  * CVE-2025-15022 (M05 / I52): by default the caption of an {@link Action}
  * reaches the client, which renders it as HTML, as escaped text. Covers the
  * context menus of {@link Table} and {@link Tree} and the shortcut actions
- * painted by {@code ActionManager} (here through {@link Panel}).
+ * painted by {@code ActionManager} (here through {@link Panel}) and the
+ * actions of {@link Calendar}, sent in its shared state.
  */
 public class ActionCaptionSanitizationTest {
 
@@ -136,6 +139,32 @@ public class ActionCaptionSanitizationTest {
         assertEscaped(paintedCaptions(target));
         // the shortcut itself is still painted
         Mockito.verify(target).addAttribute("kc", ShortcutAction.KeyCode.S);
+    }
+
+    /** Captions of the actions that a Calendar sends in its state. */
+    static List<String> calendarCaptions(Action action) throws Exception {
+        Calendar calendar = attach(new Calendar());
+        java.util.Date start = new java.util.GregorianCalendar(2026, 10, 13)
+                .getTime();
+        calendar.setStartDate(start);
+        calendar.setEndDate(start);
+        calendar.addActionHandler(new FixedHandler(action));
+        calendar.beforeClientResponse(true);
+        java.lang.reflect.Method getState = Calendar.class
+                .getDeclaredMethod("getState");
+        getState.setAccessible(true);
+        CalendarState state = (CalendarState) getState.invoke(calendar);
+        List<String> captions = new ArrayList<String>();
+        Assert.assertNotNull("no calendar actions in the state", state.actions);
+        for (CalendarState.Action a : state.actions) {
+            captions.add(a.caption);
+        }
+        return captions;
+    }
+
+    @Test
+    public void calendarActionCaptionIsEscaped() throws Exception {
+        assertEscaped(calendarCaptions(new Action(HOSTILE)));
     }
 
     @Test

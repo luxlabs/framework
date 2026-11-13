@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M05/I52 (CVE-2025-15022), escaped action captions; written by LuxLabs.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -738,7 +740,9 @@ public class Calendar extends AbstractComponent
                 String key = actionMapper.key(action);
                 CalendarState.Action calendarAction = new CalendarState.Action();
                 calendarAction.actionKey = key;
-                calendarAction.caption = action.getCaption();
+                // the client renders action captions as HTML: escaped
+                // unless captionAsHtml (CVE-2025-15022)
+                calendarAction.caption = action.getCaptionAsClientHtml();
                 setResource(key, action.getIcon());
                 calendarAction.iconKey = key;
                 calendarAction.startDate = formatter.format(range.getStart());

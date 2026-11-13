@@ -77,6 +77,14 @@ public class ActionCaptionAsHtmlTest {
     }
 
     @Test
+    public void calendarCaptionAsHtml() throws Exception {
+        Action action = new Action(HTML);
+        action.setCaptionAsHtml(true);
+        Assert.assertTrue(ActionCaptionSanitizationTest
+                .calendarCaptions(action).contains(HTML));
+    }
+
+    @Test
     public void nullCaptionIsNotPainted() throws PaintException {
         PaintTarget target = Mockito.mock(PaintTarget.class);
         ActionCaptionSanitizationTest.table(new Action(null))
