@@ -1,6 +1,5 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: REM F2d I09, from Vaadin 8 fd1a8df74a (#11791).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -359,7 +358,6 @@ public class MessageSender {
      * state from the server
      */
     public void resynchronize() {
-        getMessageHandler().onResynchronize();
         getLogger().info("Resynchronizing from server");
         JsonObject resyncParam = Json.createObject();
         resyncParam.put(ApplicationConstants.RESYNCHRONIZE_ID, true);

@@ -1,6 +1,5 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: REM F2d I09, from Vaadin 8 fd1a8df74a (#11791).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -194,7 +193,6 @@ public class MessageHandler {
     private int lastSeenServerSyncId = UNDEFINED_SYNC_ID;
 
     private ApplicationConnection connection;
-    private boolean resyncInProgress;
 
     /**
      * Data structure holding information about pending UIDL messages.
@@ -265,17 +263,7 @@ public class MessageHandler {
     protected void handleJSON(final ValueMap json) {
         final int serverId = getServerId(json);
 
-        boolean hasResynchronize = isResynchronize(json);
-
-        if (!hasResynchronize && resyncInProgress) {
-            Logger.getLogger(MessageHandler.class.getName()).warning(
-                    "Dropping the response of a request before a resync request.");
-            return;
-        }
-
-        resyncInProgress = false;
-
-        if (hasResynchronize && !isNextExpectedMessage(serverId)) {
+        if (isResynchronize(json) && !isNextExpectedMessage(serverId)) {
             // Resynchronize request. We must remove any old pending
             // messages and ensure this is handled next. Otherwise we
             // would keep waiting for an older message forever (if this
@@ -338,7 +326,7 @@ public class MessageHandler {
             int serverNextExpected = json
                     .getInt(ApplicationConstants.CLIENT_TO_SERVER_ID);
             getMessageSender().setClientToServerMessageId(serverNextExpected,
-                    hasResynchronize);
+                    isResynchronize(json));
         }
 
         if (serverId != -1) {
@@ -1848,7 +1836,4 @@ public class MessageHandler {
         }
     }-*/;
 
-    public void onResynchronize() {
-        resyncInProgress = true;
-    }
 }
