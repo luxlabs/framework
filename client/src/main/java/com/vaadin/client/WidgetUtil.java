@@ -1,6 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f).
+ * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f); I03, autocomplete off also for Chromium user agents not detected as Chrome (written for the fork).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -1958,12 +1958,30 @@ public class WidgetUtil {
          * way, and they might be useful in a combo box where new items are
          * allowed.
          */
-        if (BrowserInfo.get().isChrome()) {
+        if (BrowserInfo.get().isChrome()
+                || isChromiumUserAgent(BrowserInfo.getBrowserString())) {
             // Chrome supports "off" and the invalid value does not work with
             // Chrome
             textBox.getElement().setAttribute("autocomplete", "off");
         } else {
             textBox.getElement().setAttribute("autocomplete", "nope");
         }
+    }
+
+    /**
+     * Tells whether the user agent is a Chromium based browser, including
+     * those that {@link BrowserInfo#isChrome()} does not recognize, such as
+     * headless Chrome ({@code HeadlessChrome/}).
+     * <p>
+     * For internal use only. May be removed or replaced in the future.
+     *
+     * @param userAgent
+     *            the user agent string, may be {@code null}
+     * @return {@code true} if the user agent contains a Chrome version token
+     * @since 7.7.17.1
+     */
+    public static boolean isChromiumUserAgent(String userAgent) {
+        return userAgent != null
+                && userAgent.toLowerCase().contains("chrome/");
     }
 }

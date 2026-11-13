@@ -15,6 +15,7 @@ package com.vaadin.client.gwttest.client;
 
 import com.google.gwt.junit.client.GWTTestCase;
 import com.vaadin.client.BrowserInfo;
+import com.vaadin.client.WidgetUtil;
 import com.vaadin.client.ui.VFilterSelect;
 import com.vaadin.client.ui.VTextualDate;
 
@@ -45,5 +46,17 @@ public class AutocompleteGwtTest extends GWTTestCase {
         VTextualDate dateField = new VTextualDate();
         assertEquals("off",
                 dateField.text.getElement().getAttribute("autocomplete"));
+    }
+
+    public void testChromiumUserAgents() {
+        assertTrue(WidgetUtil.isChromiumUserAgent(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"));
+        assertTrue("headless Chrome", WidgetUtil.isChromiumUserAgent(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/131.0.0.0 Safari/537.36"));
+        assertFalse(WidgetUtil.isChromiumUserAgent(
+                "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"));
+        assertFalse(WidgetUtil.isChromiumUserAgent(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"));
+        assertFalse(WidgetUtil.isChromiumUserAgent(null));
     }
 }
