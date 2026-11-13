@@ -1,6 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: I01, remove the select-all header click handler with the selection column (from Vaadin 8 89fd72ed); I15, add columns at the visible index when columns are hidden (written for the fork).
+ * Modified by LuxLabs in 2026: I01, remove the select-all header click handler with the selection column (from Vaadin 8 89fd72ed); I15, add columns at the visible index when columns are hidden (written for the fork); M03, column hiding toggle caption as text (written for the fork).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -61,6 +61,7 @@ import com.google.gwt.event.logical.shared.CloseHandler;
 import com.google.gwt.event.logical.shared.ValueChangeEvent;
 import com.google.gwt.event.logical.shared.ValueChangeHandler;
 import com.google.gwt.event.shared.HandlerRegistration;
+import com.google.gwt.safehtml.shared.SafeHtmlUtils;
 import com.google.gwt.touch.client.Point;
 import com.google.gwt.user.client.DOM;
 import com.google.gwt.user.client.Event;
@@ -4113,7 +4114,9 @@ public class Grid<T> extends ResizeComposite implements HasSelectionHandlers<T>,
             if (caption == null) {
                 caption = column.headerCaption;
             }
-            buf.append(caption);
+            // The hiding toggle caption and the header caption are text: the
+            // client column has no HTML mode for them (M03, CVE-2019-25028)
+            buf.append(SafeHtmlUtils.htmlEscape(String.valueOf(caption)));
             buf.append("</div></span>");
 
             return buf.toString();
