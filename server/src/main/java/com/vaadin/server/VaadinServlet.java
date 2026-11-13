@@ -27,6 +27,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Serializable;
 import java.lang.reflect.Method;
+import java.net.JarURLConnection;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -42,6 +43,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -783,10 +786,12 @@ public class VaadinServlet extends HttpServlet implements Constants {
         }
 
         // security check: do not permit navigation out of the VAADIN
-        // directory
+        // directory or into any directory rather than a file
         if (!isAllowedVAADINResourceUrl(request, resourceUrl)) {
             getLogger().log(Level.INFO,
-                    "Requested resource [{0}] not accessible in the VAADIN directory or access to it is forbidden.",
+                    "Requested resource [{0}] is a directory, "
+                            + "is not within the VAADIN directory, "
+                            + "or access to it is forbidden.",
                     filename);
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             return;
@@ -1032,7 +1037,9 @@ public class VaadinServlet extends HttpServlet implements Constants {
         // directory
         if (!isAllowedVAADINResourceUrl(request, scssUrl)) {
             getLogger().log(Level.INFO,
-                    "Requested resource [{0}] not accessible in the VAADIN directory or access to it is forbidden.",
+                    "Requested resource [{0}] is a directory, "
+                            + "is not within the VAADIN directory, "
+                            + "or access to it is forbidden.",
                     filename);
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 
@@ -1141,7 +1148,8 @@ public class VaadinServlet extends HttpServlet implements Constants {
 
     /**
      * Check whether a URL obtained from a classloader refers to a valid static
-     * resource in the directory VAADIN.
+     * resource in the directory VAADIN. Directories do not count as valid
+     * resources.
      *
      * Warning: Overriding of this method is not recommended, but is possible to
      * support non-default classloaders or servers that may produce URLs
@@ -1161,6 +1169,9 @@ public class VaadinServlet extends HttpServlet implements Constants {
     @Deprecated
     protected boolean isAllowedVAADINResourceUrl(HttpServletRequest request,
             URL resourceUrl) {
+        if (resourceUrl == null || resourceIsDirectory(resourceUrl)) {
+            return false;
+        }
         String resourcePath = resourceUrl.getPath();
         if ("jar".equals(resourceUrl.getProtocol())) {
             // This branch is used for accessing resources directly from the
@@ -1199,6 +1210,67 @@ public class VaadinServlet extends HttpServlet implements Constants {
                     resourceUrl);
             return true;
         }
+    }
+
+    /**
+     * Checks whether a resource URL denotes a directory: a path ending with a
+     * slash, a directory entry (explicit or implied by the entries under it)
+     * of a jar file, or a directory of the file system. For other protocols
+     * the check cannot be made and the resource is not treated as a
+     * directory.
+     */
+    private boolean resourceIsDirectory(URL resource) {
+        if (resource.getPath().endsWith("/")) {
+            return true;
+        }
+        String protocol = resource.getProtocol();
+        if ("jar".equals(protocol)) {
+            try {
+                URLConnection connection = resource.openConnection();
+                if (!(connection instanceof JarURLConnection)) {
+                    return false;
+                }
+                JarURLConnection jarConnection = (JarURLConnection) connection;
+                String entryName = jarConnection.getEntryName();
+                if (entryName == null) {
+                    // the root of the jar
+                    return true;
+                }
+                // shared, cached JarFile: not to be closed here
+                JarFile jarFile = jarConnection.getJarFile();
+                // getJarEntry also finds an explicit "entryName/" entry
+                JarEntry entry = jarFile.getJarEntry(entryName);
+                if (entry != null) {
+                    return entry.isDirectory();
+                }
+                String prefix = entryName + "/";
+                Enumeration<JarEntry> entries = jarFile.entries();
+                while (entries.hasMoreElements()) {
+                    if (entries.nextElement().getName().startsWith(prefix)) {
+                        return true;
+                    }
+                }
+                return false;
+            } catch (IOException e) {
+                getLogger().log(Level.FINE,
+                        "failed to read jar file contents", e);
+                return false;
+            }
+        }
+        if ("file".equals(protocol)) {
+            try {
+                return new File(resource.toURI()).isDirectory();
+            } catch (URISyntaxException e) {
+                getLogger().log(Level.FINE,
+                        "Syntax error in uri from getStaticResource", e);
+                return false;
+            } catch (IllegalArgumentException e) {
+                getLogger().log(Level.FINE,
+                        "Not a file uri from getStaticResource", e);
+                return false;
+            }
+        }
+        return false;
     }
 
     /**

@@ -211,7 +211,9 @@ public class VaadinServletService extends VaadinService {
             // directory
             if (!servlet.isAllowedVAADINResourceUrl(null, resourceUrl)) {
                 throw new IOException(String.format(
-                        "Requested resource [{0}] not accessible in the VAADIN directory or access to it is forbidden.",
+                        "Requested resource [%s] is a directory, "
+                                + "is not within the VAADIN directory, "
+                                + "or access to it is forbidden.",
                         filename));
             }
 
