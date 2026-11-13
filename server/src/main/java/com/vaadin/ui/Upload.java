@@ -120,6 +120,11 @@ public class Upload extends AbstractComponent
      */
     private boolean fileSizeLimitExceeded = false;
 
+    /**
+     * Set when the form was submitted without a selected file (I41).
+     */
+    private boolean noFileSelected = false;
+
     private boolean notStarted;
 
     private int nextid;
@@ -1013,6 +1018,7 @@ public class Upload extends AbstractComponent
         contentLength = -1;
         interrupted = false;
         fileSizeLimitExceeded = false;
+        noFileSelected = false;
         markAsDirty();
     }
 
@@ -1207,21 +1213,20 @@ public class Upload extends AbstractComponent
     }
 
     /**
-     * Forces the upload the send selected file to the server.
+     * Instructs the upload component to send selected file to the server.
      * <p>
      * In case developer wants to use this feature, he/she will most probably
-     * want to hide the uploads internal submit button by setting its caption to
-     * null with {@link #setButtonCaption(String)} method.
+     * want to hide the upload component's internal submit button by setting its
+     * caption to null with {@link #setButtonCaption(String)} method.
      * <p>
-     * Note, that the upload runs asynchronous. Developer should use normal
-     * upload listeners to trac the process of upload. If the field is empty
-     * uploaded the file name will be empty string and file length 0 in the
-     * upload finished event.
+     * Note that the upload runs asynchronously. Developer should use normal
+     * upload listeners to track the process of upload. If the file name field
+     * is empty, no upload will be triggered.
      * <p>
-     * Also note, that the developer should not remove or modify the upload in
-     * the same user transaction where the upload submit is requested. The
-     * upload may safely be hidden or removed once the upload started event is
-     * fired.
+     * Also note that the developer should not remove or modify the upload
+     * component in the same user transaction where the upload submit is
+     * requested. The upload component can be safely hidden or removed once the
+     * upload started event has been fired.
      */
     public void submitUpload() {
         markAsDirty();
@@ -1284,8 +1289,16 @@ public class Upload extends AbstractComponent
                 public void streamingStarted(StreamingStartEvent event) {
                     startUpload();
                     contentLength = event.getContentLength();
-                    fireStarted(event.getFileName(), event.getMimeType());
                     lastStartedEvent = event;
+                    if (event.getFileName() == null
+                            || event.getFileName().isEmpty()) {
+                        // submitted without a selected file: the upload does
+                        // not start, no listener and no receiver is called
+                        noFileSelected = true;
+                        interrupted = true;
+                        return;
+                    }
+                    fireStarted(event.getFileName(), event.getMimeType());
                     if (maxFileSize >= 0 && contentLength > maxFileSize) {
                         // declared over the limit: stop before the receiver
                         // creates any output
@@ -1307,7 +1320,9 @@ public class Upload extends AbstractComponent
                 public void streamingFailed(StreamingErrorEvent event) {
                     try {
                         Exception exception = event.getException();
-                        if (exception instanceof NoInputStreamException) {
+                        if (noFileSelected) {
+                            // nothing was started: nothing to report
+                        } else if (exception instanceof NoInputStreamException) {
                             fireNoInputStream(event.getFileName(),
                                     event.getMimeType(), 0);
                         } else if (exception instanceof NoOutputStreamException) {
