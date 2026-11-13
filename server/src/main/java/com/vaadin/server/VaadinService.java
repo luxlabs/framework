@@ -614,8 +614,15 @@ public abstract class VaadinService implements Serializable {
      *             if the session is invalidated before it can be locked
      */
     protected void lockSession(WrappedSession wrappedSession) {
-        lockSessionAndGetLock(wrappedSession);
+        LOCKED_BY_LOCK_SESSION.set(lockSessionAndGetLock(wrappedSession));
     }
+
+    /**
+     * The lock instance acquired by the default {@link #lockSession} in this
+     * thread, read and cleared by findOrCreateVaadinSession, which needs it
+     * to release the lock if the session is invalidated meanwhile (I23).
+     */
+    private static final ThreadLocal<Lock> LOCKED_BY_LOCK_SESSION = new ThreadLocal<Lock>();
 
     /**
      * Locks the given session and returns the lock instance that was locked,
@@ -683,21 +690,50 @@ public abstract class VaadinService implements Serializable {
         WrappedSession wrappedSession = getWrappedSession(request,
                 requestCanCreateSession);
 
-        final Lock lock;
+        // The protected hooks lockSession and unlockSession are called as in
+        // 7.7.17, so that subclasses that override them keep working
+        Lock lock;
+        LOCKED_BY_LOCK_SESSION.remove();
         try {
-            lock = lockSessionAndGetLock(wrappedSession);
+            lockSession(wrappedSession);
+            lock = LOCKED_BY_LOCK_SESSION.get();
         } catch (IllegalStateException e) {
             throw new SessionExpiredException();
+        } finally {
+            LOCKED_BY_LOCK_SESSION.remove();
         }
+        if (lock == null) {
+            // an override that does not call super: find the lock instance
+            try {
+                lock = getSessionLock(wrappedSession);
+            } catch (IllegalStateException e) {
+                lock = null;
+            }
+        }
+        int holdCount = lock instanceof ReentrantLock
+                ? ((ReentrantLock) lock).getHoldCount() : -1;
 
         try {
             return doFindOrCreateVaadinSession(request,
                     requestCanCreateSession);
         } finally {
-            // Release the instance that was locked: reading it again from the
-            // session fails if another thread has invalidated the session in
-            // the meantime, which would leave it locked forever (I23)
-            lock.unlock();
+            try {
+                unlockSession(wrappedSession);
+            } catch (IllegalStateException e) {
+                // Another thread has invalidated the session meanwhile:
+                // unlockSession cannot read the lock from it. Release the
+                // instance that this thread locked, unless it was already
+                // released, otherwise it stays locked forever (I23)
+                if (lock instanceof ReentrantLock) {
+                    ReentrantLock reentrant = (ReentrantLock) lock;
+                    if (reentrant.isHeldByCurrentThread()
+                            && reentrant.getHoldCount() == holdCount) {
+                        reentrant.unlock();
+                    }
+                } else if (lock != null) {
+                    lock.unlock();
+                }
+            }
         }
 
     }
