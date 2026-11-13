@@ -18,6 +18,8 @@ package com.vaadin.server.communication;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
 import java.util.Collection;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -473,7 +475,9 @@ public class PushHandler {
     }
 
     /**
-     * Checks whether a given push id matches the session's push id.
+     * Checks whether a given push id matches the session's push id. The
+     * comparison is done using a time-constant method since the push id is used
+     * to protect against cross-site attacks.
      *
      * @param session
      *            the vaadin session for which the check should be done
@@ -485,7 +489,10 @@ public class PushHandler {
             String requestPushId) {
 
         String sessionPushId = session.getPushId();
-        if (requestPushId == null || !requestPushId.equals(sessionPushId)) {
+        if (requestPushId == null || sessionPushId == null
+                || !MessageDigest.isEqual(
+                        requestPushId.getBytes(Charset.forName("UTF-8")),
+                        sessionPushId.getBytes(Charset.forName("UTF-8")))) {
             return false;
         }
         return true;

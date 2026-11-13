@@ -28,6 +28,8 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -1757,7 +1759,11 @@ public abstract class VaadinService implements Serializable {
                 .isXsrfProtectionEnabled()) {
             String sessionToken = session.getCsrfToken();
 
-            if (sessionToken == null || !sessionToken.equals(requestToken)) {
+            // time-constant comparison (CVE-2021-31403)
+            if (sessionToken == null || requestToken == null
+                    || !MessageDigest.isEqual(
+                            sessionToken.getBytes(Charset.forName("UTF-8")),
+                            requestToken.getBytes(Charset.forName("UTF-8")))) {
                 return false;
             }
         }
