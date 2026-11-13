@@ -1150,8 +1150,9 @@ public class VaadinServlet extends HttpServlet implements Constants {
 
     /**
      * Check whether a URL obtained from a classloader refers to a valid static
-     * resource in the directory VAADIN. Directories do not count as valid
-     * resources.
+     * resource in the directory VAADIN. Only resources verified to be regular
+     * files count as valid: directories, and resources whose nature cannot be
+     * determined (protocols other than file: and jar:), are not allowed.
      *
      * Warning: Overriding of this method is not recommended, but is possible to
      * support non-default classloaders or servers that may produce URLs
@@ -1171,7 +1172,7 @@ public class VaadinServlet extends HttpServlet implements Constants {
     @Deprecated
     protected boolean isAllowedVAADINResourceUrl(HttpServletRequest request,
             URL resourceUrl) {
-        if (resourceUrl == null || resourceIsDirectory(resourceUrl)) {
+        if (resourceUrl == null || !resourceIsVerifiedFile(resourceUrl)) {
             return false;
         }
         String resourcePath = resourceUrl.getPath();
@@ -1215,15 +1216,18 @@ public class VaadinServlet extends HttpServlet implements Constants {
     }
 
     /**
-     * Checks whether a resource URL denotes a directory: a path ending with a
-     * slash, a directory entry (explicit or implied by the entries under it)
-     * of a jar file, or a directory of the file system. For other protocols
-     * the check cannot be made and the resource is not treated as a
-     * directory.
+     * Checks that a resource URL denotes a regular file, failing closed: only
+     * a URL that is verified to be a file is accepted. file: URLs must be an
+     * existing regular file; jar: URLs must open as a {@link JarURLConnection}
+     * (the JDK handler, or a handler that extends it, as the Spring Boot
+     * loader does) on an existing entry that is not a directory. A path
+     * ending with a slash, any other protocol (for example vfs: or a custom
+     * class loader protocol) and any URL whose nature cannot be determined
+     * are refused (M14, review R3).
      */
-    private boolean resourceIsDirectory(URL resource) {
+    private boolean resourceIsVerifiedFile(URL resource) {
         if (resource.getPath().endsWith("/")) {
-            return true;
+            return false;
         }
         String protocol = resource.getProtocol();
         if ("jar".equals(protocol)) {
@@ -1234,43 +1238,38 @@ public class VaadinServlet extends HttpServlet implements Constants {
                 }
                 JarURLConnection jarConnection = (JarURLConnection) connection;
                 String entryName = jarConnection.getEntryName();
-                if (entryName == null) {
-                    // the root of the jar
-                    return true;
+                if (entryName == null || entryName.endsWith("/")) {
+                    return false;
                 }
                 // shared, cached JarFile: not to be closed here
                 JarFile jarFile = jarConnection.getJarFile();
-                // getJarEntry also finds an explicit "entryName/" entry
+                // getJarEntry also finds an explicit "entryName/" entry,
+                // which is a directory
                 JarEntry entry = jarFile.getJarEntry(entryName);
-                if (entry != null) {
-                    return entry.isDirectory();
-                }
-                String prefix = entryName + "/";
-                Enumeration<JarEntry> entries = jarFile.entries();
-                while (entries.hasMoreElements()) {
-                    if (entries.nextElement().getName().startsWith(prefix)) {
-                        return true;
-                    }
-                }
-                return false;
+                return entry != null && !entry.isDirectory();
             } catch (IOException e) {
                 getLogger().log(Level.FINE,
                         "failed to read jar file contents", e);
                 return false;
+            } catch (RuntimeException e) {
+                getLogger().log(Level.FINE, "cannot classify jar resource",
+                        e);
+                return false;
             }
         }
         if ("file".equals(protocol)) {
+            File file;
             try {
-                return new File(resource.toURI()).isDirectory();
+                file = new File(resource.toURI());
             } catch (URISyntaxException e) {
-                getLogger().log(Level.FINE,
-                        "Syntax error in uri from getStaticResource", e);
-                return false;
+                // not a valid URI, e.g. a path with unencoded spaces: the
+                // path of such a URL is the file system path itself
+                file = new File(resource.getPath());
             } catch (IllegalArgumentException e) {
-                getLogger().log(Level.FINE,
-                        "Not a file uri from getStaticResource", e);
+                getLogger().log(Level.FINE, "Not a file uri", e);
                 return false;
             }
+            return file.isFile();
         }
         return false;
     }
