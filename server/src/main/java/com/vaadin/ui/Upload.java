@@ -15,6 +15,8 @@
  */
 package com.vaadin.ui;
 
+import java.io.FilterOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.lang.reflect.Method;
@@ -106,6 +108,17 @@ public class Upload extends AbstractComponent
     private LinkedHashSet<ProgressListener> progressListeners;
 
     private boolean interrupted = false;
+
+    /**
+     * Maximum number of bytes accepted for one upload, -1 for no limit.
+     */
+    private long maxFileSize = -1;
+
+    /**
+     * Set when the current upload is interrupted because it exceeds
+     * {@link #maxFileSize}.
+     */
+    private boolean fileSizeLimitExceeded = false;
 
     private boolean notStarted;
 
@@ -999,11 +1012,130 @@ public class Upload extends AbstractComponent
         isUploading = false;
         contentLength = -1;
         interrupted = false;
+        fileSizeLimitExceeded = false;
         markAsDirty();
     }
 
     public boolean isUploading() {
         return isUploading;
+    }
+
+    /**
+     * Sets the maximum number of bytes accepted for one upload. The limit is
+     * applied by the framework to the bytes actually received, so it holds
+     * also when the client does not declare the length of the upload (for
+     * example a request without <code>Content-Length</code>, with chunked
+     * transfer encoding) or declares a wrong one, which a check on
+     * {@link StartedEvent#getContentLength()} in a {@link StartedListener}
+     * cannot detect.
+     * <p>
+     * When the declared length already exceeds the limit, the upload is
+     * interrupted before the {@link Receiver} is asked for an output stream,
+     * so no output is created. Otherwise no byte beyond the limit is written
+     * to the receiver's output stream: as soon as the limit would be exceeded
+     * the upload is interrupted and the output stream is closed. In both
+     * cases a {@link FailedEvent} is fired with a
+     * {@link FileSizeLimitExceededException} as its reason; a
+     * {@link FailedListener} should discard the partial content written by
+     * the receiver.
+     *
+     * @param maxFileSize
+     *            the maximum size in bytes, or -1 (the default) for no limit
+     * @throws IllegalArgumentException
+     *             if the value is smaller than -1
+     * @since 7.7.17.1
+     */
+    public void setMaxFileSize(long maxFileSize) {
+        if (maxFileSize < -1) {
+            throw new IllegalArgumentException(
+                    "maxFileSize must be -1 (no limit) or >= 0");
+        }
+        this.maxFileSize = maxFileSize;
+    }
+
+    /**
+     * Gets the maximum number of bytes accepted for one upload.
+     *
+     * @see #setMaxFileSize(long)
+     * @return the maximum size in bytes, or -1 if there is no limit
+     * @since 7.7.17.1
+     */
+    public long getMaxFileSize() {
+        return maxFileSize;
+    }
+
+    /**
+     * Reason of the {@link FailedEvent} fired when an upload exceeds the
+     * limit set with {@link Upload#setMaxFileSize(long)}.
+     *
+     * @since 7.7.17.1
+     */
+    public static class FileSizeLimitExceededException extends Exception {
+
+        private final long maxFileSize;
+
+        /**
+         * Creates the exception.
+         *
+         * @param maxFileSize
+         *            the limit that was exceeded, in bytes
+         */
+        public FileSizeLimitExceededException(long maxFileSize) {
+            super("The upload exceeds the maximum size of " + maxFileSize
+                    + " bytes");
+            this.maxFileSize = maxFileSize;
+        }
+
+        /**
+         * Gets the limit that was exceeded.
+         *
+         * @return the limit in bytes
+         */
+        public long getMaxFileSize() {
+            return maxFileSize;
+        }
+    }
+
+    /**
+     * Output stream that does not let more than {@link Upload#maxFileSize}
+     * bytes reach the receiver's stream: the write that would exceed the limit
+     * is dropped and the upload is interrupted.
+     */
+    private class SizeLimitedOutputStream extends FilterOutputStream {
+        private final long limit;
+        private long written;
+
+        SizeLimitedOutputStream(OutputStream out, long limit) {
+            super(out);
+            this.limit = limit;
+        }
+
+        @Override
+        public void write(int b) throws IOException {
+            if (exceeds(1)) {
+                return;
+            }
+            out.write(b);
+            written++;
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+            if (exceeds(len)) {
+                return;
+            }
+            out.write(b, off, len);
+            written += len;
+        }
+
+        private boolean exceeds(int len) {
+            if (fileSizeLimitExceeded || written + len > limit) {
+                fileSizeLimitExceeded = true;
+                interrupted = true;
+                return true;
+            }
+            return false;
+        }
     }
 
     /**
@@ -1139,6 +1271,12 @@ public class Upload extends AbstractComponent
                             lastStartedEvent.getFileName(),
                             lastStartedEvent.getMimeType());
                     lastStartedEvent = null;
+                    if (receiveUpload != null && maxFileSize >= 0) {
+                        // the limit holds on the bytes actually received,
+                        // whatever length the client declared (CVE-2025-9467)
+                        return new SizeLimitedOutputStream(receiveUpload,
+                                maxFileSize);
+                    }
                     return receiveUpload;
                 }
 
@@ -1148,6 +1286,12 @@ public class Upload extends AbstractComponent
                     contentLength = event.getContentLength();
                     fireStarted(event.getFileName(), event.getMimeType());
                     lastStartedEvent = event;
+                    if (maxFileSize >= 0 && contentLength > maxFileSize) {
+                        // declared over the limit: stop before the receiver
+                        // creates any output
+                        fileSizeLimitExceeded = true;
+                        interrupted = true;
+                    }
                 }
 
                 @Override
@@ -1169,6 +1313,11 @@ public class Upload extends AbstractComponent
                         } else if (exception instanceof NoOutputStreamException) {
                             fireNoOutputStream(event.getFileName(),
                                     event.getMimeType(), 0);
+                        } else if (fileSizeLimitExceeded) {
+                            fireUploadInterrupted(event.getFileName(),
+                                    event.getMimeType(), 0,
+                                    new FileSizeLimitExceededException(
+                                            maxFileSize));
                         } else {
                             fireUploadInterrupted(event.getFileName(),
                                     event.getMimeType(), 0, exception);

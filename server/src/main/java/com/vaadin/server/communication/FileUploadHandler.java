@@ -551,14 +551,26 @@ public class FileUploadHandler implements RequestHandler {
         StreamingStartEventImpl startedEvent = new StreamingStartEventImpl(
                 filename, type, contentLength);
         try {
-            boolean listenProgress;
+            boolean listenProgress = false;
+            boolean interruptedAtStart;
             session.lock();
             try {
                 streamVariable.streamingStarted(startedEvent);
-                out = streamVariable.getOutputStream();
-                listenProgress = streamVariable.listenProgress();
+                // an interruption requested while handling the start (e.g.
+                // by a StartedListener that validates the metadata) stops
+                // the upload before the receiver creates any output
+                // (CVE-2025-9467)
+                interruptedAtStart = streamVariable.isInterrupted();
+                if (!interruptedAtStart) {
+                    out = streamVariable.getOutputStream();
+                    listenProgress = streamVariable.listenProgress();
+                }
             } finally {
                 session.unlock();
+            }
+
+            if (interruptedAtStart) {
+                throw new UploadInterruptedException();
             }
 
             // Gets the output target stream
@@ -577,6 +589,10 @@ public class FileUploadHandler implements RequestHandler {
             do {
                 bytesReadToBuffer = in.read(buffer);
                 if (bytesReadToBuffer > 0) {
+                    if (streamVariable.isInterrupted()) {
+                        // no byte reaches the receiver after an interruption
+                        throw new UploadInterruptedException();
+                    }
                     out.write(buffer, 0, bytesReadToBuffer);
                     totalBytes += bytesReadToBuffer;
                 }
