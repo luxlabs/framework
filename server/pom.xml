@@ -161,24 +161,16 @@
     <build>
         <plugins>
             <plugin>
-                <!-- jsoup 1.24.1 (I27): the jar is multi-release with Java 11
-                    classes, which animal-sniffer 1.15 cannot read, so it is
-                    left out of the scanned dependencies and its classes are
-                    ignored; it takes a java.util.function.Consumer to
-                    customize tags. vaadin-server requires Java 8 at runtime
-                    with it (I57). The check of the JDK API used by Vaadin
-                    itself stays at Java 6. -->
+                <!-- jsoup 1.24.1 (I27) takes a java.util.function.Consumer to
+                    customize tags; vaadin-server requires Java 8 at runtime
+                    with it (I57). jsoup itself is excluded in the root POM. -->
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>animal-sniffer-maven-plugin</artifactId>
                 <executions>
                     <execution>
                         <id>java6compatibility</id>
                         <configuration>
-                            <excludeDependencies>
-                                <excludeDependency>org.jsoup:jsoup</excludeDependency>
-                            </excludeDependencies>
-                            <ignores>
-                                <ignore>org.jsoup.*</ignore>
+                            <ignores combine.children="append">
                                 <ignore>java.util.function.Consumer</ignore>
                             </ignores>
                         </configuration>
