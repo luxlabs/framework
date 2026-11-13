@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- REM F2c: module for the GWTTestCase tests run with HtmlUnit (see LoopbackJUnitShellRunner). -->
+<module>
+    <inherits name="com.vaadin.Vaadin" />
+    <!-- elemental.Json is inherited by com.vaadin.DefaultWidgetSet, not by com.vaadin.Vaadin -->
+    <inherits name="elemental.Json" />
+    <source path="client" />
+</module>
