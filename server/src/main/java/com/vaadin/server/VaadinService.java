@@ -612,6 +612,22 @@ public abstract class VaadinService implements Serializable {
      *             if the session is invalidated before it can be locked
      */
     protected void lockSession(WrappedSession wrappedSession) {
+        lockSessionAndGetLock(wrappedSession);
+    }
+
+    /**
+     * Locks the given session and returns the lock instance that was locked,
+     * so that it can be released even if the session is invalidated in the
+     * meantime and {@link #getSessionLock(WrappedSession)} can no longer read
+     * it (I23, see Vaadin 8.14 where lockSession returns the lock).
+     *
+     * @param wrappedSession
+     *            The session to lock
+     * @return the locked lock instance
+     * @throws IllegalStateException
+     *             if the session is invalidated before it can be locked
+     */
+    private Lock lockSessionAndGetLock(WrappedSession wrappedSession) {
         Lock lock = getSessionLock(wrappedSession);
         if (lock == null) {
             /*
@@ -641,6 +657,7 @@ public abstract class VaadinService implements Serializable {
             lock.unlock();
             throw e;
         }
+        return lock;
     }
 
     /**
@@ -664,8 +681,9 @@ public abstract class VaadinService implements Serializable {
         WrappedSession wrappedSession = getWrappedSession(request,
                 requestCanCreateSession);
 
+        final Lock lock;
         try {
-            lockSession(wrappedSession);
+            lock = lockSessionAndGetLock(wrappedSession);
         } catch (IllegalStateException e) {
             throw new SessionExpiredException();
         }
@@ -674,7 +692,10 @@ public abstract class VaadinService implements Serializable {
             return doFindOrCreateVaadinSession(request,
                     requestCanCreateSession);
         } finally {
-            unlockSession(wrappedSession);
+            // Release the instance that was locked: reading it again from the
+            // session fails if another thread has invalidated the session in
+            // the meantime, which would leave it locked forever (I23)
+            lock.unlock();
         }
 
     }
