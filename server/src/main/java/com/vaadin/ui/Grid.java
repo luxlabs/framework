@@ -3408,6 +3408,28 @@ public class Grid extends AbstractFocusable implements SelectionNotifier,
         }
 
         /**
+         * Reduces a caption to plain text that is also safe where the client
+         * inserts it as HTML. {@code Jsoup.parse(s).text()} removes the markup
+         * but decodes character references, so {@code "&lt;img ...&gt;"}
+         * would become markup again: the reduction is repeated until the
+         * text no longer changes. A text that is unchanged by the reduction
+         * contains neither elements nor character references.
+         */
+        private static String toPlainText(String caption) {
+            String text = caption;
+            for (int i = 0; i < 16; i++) {
+                String next = Jsoup.parse(text).text();
+                if (next.equals(text)) {
+                    return text;
+                }
+                text = next;
+            }
+            // pathological nesting: drop the characters that can start
+            // markup or a character reference
+            return text.replace("<", "").replace("&", "");
+        }
+
+        /**
          * Sets the caption of the header. This caption is also used as the
          * hiding toggle caption, unless it is explicitly set via
          * {@link #setHidingToggleCaption(String)}.
@@ -3427,7 +3449,7 @@ public class Grid extends AbstractFocusable implements SelectionNotifier,
             }
             // the client renders the caption as HTML in some places (column
             // hiding toggle): send plain text only (CVE-2019-25028)
-            caption = Jsoup.parse(caption).text();
+            caption = toPlainText(caption);
             state.headerCaption = caption;
 
             HeaderRow row = grid.getHeader().getDefaultRow();
@@ -3473,7 +3495,9 @@ public class Grid extends AbstractFocusable implements SelectionNotifier,
         public Column setHidingToggleCaption(String hidingToggleCaption)
                 throws IllegalStateException {
             checkColumnIsAttached();
-            state.hidingToggleCaption = hidingToggleCaption;
+            // rendered as HTML by the client, like the header caption
+            state.hidingToggleCaption = hidingToggleCaption == null ? null
+                    : toPlainText(hidingToggleCaption);
             grid.markAsDirty();
             return this;
         }

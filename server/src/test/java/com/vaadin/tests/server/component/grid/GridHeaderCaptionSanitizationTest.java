@@ -73,10 +73,34 @@ public class GridHeaderCaptionSanitizationTest {
     }
 
     @Test
+    public void encodedMarkupIsNotDecodedIntoMarkup() {
+        Column column = grid.getColumn("name");
+        column.setHeaderCaption("&lt;img src=x onerror=alert(1)&gt;");
+        String sent = columnState().headerCaption;
+        Assert.assertFalse("decoded markup in the header caption state: "
+                + sent, sent.contains("<img"));
+        column.setHeaderCaption("&amp;lt;img src=x onerror=alert(1)&amp;gt;");
+        sent = columnState().headerCaption;
+        Assert.assertFalse("decoded markup in the header caption state: "
+                + sent, sent.contains("<img"));
+    }
+
+    @Test
+    public void hidingToggleCaptionIsSentAsText() {
+        Column column = grid.getColumn("name");
+        column.setHidingToggleCaption(HOSTILE);
+        Assert.assertEquals("Name bold", columnState().hidingToggleCaption);
+        column.setHidingToggleCaption(null);
+        Assert.assertNull(columnState().hidingToggleCaption);
+    }
+
+    @Test
     public void plainCaptionsAreUnchanged() {
         Column column = grid.getColumn("name");
         column.setHeaderCaption("Price & tax (EUR)");
         Assert.assertEquals("Price & tax (EUR)", columnState().headerCaption);
+        column.setHeaderCaption("a < b");
+        Assert.assertEquals("a < b", columnState().headerCaption);
         column.setHeaderCaption(null);
         Assert.assertEquals("", columnState().headerCaption);
     }
