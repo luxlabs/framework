@@ -1,6 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f); I14, select or add the typed value when the field is left before the filtering response (written for the fork); I40, fewer popup position resets (from Vaadin 8 a8310a63, without the menu padding term of f1dc01ec).
+ * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f); I14, select or add the typed value when the field is left before the filtering response (written for the fork); I40, fewer popup position resets (from Vaadin 8 a8310a63, with the menu padding of f1dc01ec in its own check only).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -922,8 +922,11 @@ public class VFilterSelect extends Composite
                 }
             }
 
-            if (offsetWidth + left < VFilterSelect.this.getAbsoluteLeft()
-                    + VFilterSelect.this.getOffsetWidth()) {
+            double menuMarginBorderPaddingWidth = getMarginBorderPaddingWidth(
+                    menu.getElement());
+            if (offsetWidth + menuMarginBorderPaddingWidth
+                    + left < VFilterSelect.this.getAbsoluteLeft()
+                            + VFilterSelect.this.getOffsetWidth()) {
                 // Popup doesn't reach all the way to the end of the input
                 // field, filtering may have changed the popup width.
                 left = VFilterSelect.this.getAbsoluteLeft();
