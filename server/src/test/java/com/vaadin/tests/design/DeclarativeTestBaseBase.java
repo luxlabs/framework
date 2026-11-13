@@ -14,7 +14,6 @@ import java.util.logging.Logger;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Attribute;
-import org.jsoup.nodes.BooleanAttribute;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
 import org.jsoup.nodes.TextNode;
@@ -207,8 +206,8 @@ public abstract class DeclarativeTestBaseBase<T extends Component> {
     public void testWrite(String design, T expected, boolean writeData) {
         String written = write(expected, writeData);
 
-        Element producedElem = Jsoup.parse(written).body().child(0);
-        Element comparableElem = Jsoup.parse(design).body().child(0);
+        Element producedElem = parseDesign(written).body().child(0);
+        Element comparableElem = parseDesign(design).body().child(0);
 
         String produced = elementToHtml(producedElem);
         String comparable = elementToHtml(comparableElem);
@@ -219,8 +218,8 @@ public abstract class DeclarativeTestBaseBase<T extends Component> {
     public void testWrite(T component, String expected, DesignContext context) {
         String written = write(component, context);
 
-        Element producedElem = Jsoup.parse(written).body().child(0);
-        Element comparableElem = Jsoup.parse(expected).body().child(0);
+        Element producedElem = parseDesign(written).body().child(0);
+        Element comparableElem = parseDesign(expected).body().child(0);
 
         String produced = elementToHtml(producedElem);
         String comparable = elementToHtml(comparableElem);
@@ -239,6 +238,25 @@ public abstract class DeclarativeTestBaseBase<T extends Component> {
     }
 
     /**
+     * Parses a design like {@code Design.read} does with jsoup 1.24.1:
+     * custom (unknown) tags and menu may be self-closing.
+     */
+    private static org.jsoup.nodes.Document parseDesign(String html) {
+        org.jsoup.parser.Parser parser = org.jsoup.parser.Parser.htmlParser();
+        parser.tagSet().onNewTag(
+                new java.util.function.Consumer<org.jsoup.parser.Tag>() {
+                    @Override
+                    public void accept(org.jsoup.parser.Tag tag) {
+                        if (!tag.isKnownTag()
+                                || "menu".equals(tag.normalName())) {
+                            tag.set(org.jsoup.parser.Tag.SelfClose);
+                        }
+                    }
+                });
+        return Jsoup.parse(html, "", parser);
+    }
+
+    /**
      * Produce predictable html (attributes in alphabetical order), always
      * include close tags
      */
@@ -247,7 +265,7 @@ public abstract class DeclarativeTestBaseBase<T extends Component> {
         ArrayList<String> names = new ArrayList<String>();
         for (Attribute a : producedElem.attributes().asList()) {
             names.add(a.getKey());
-            if (a instanceof BooleanAttribute) {
+            if (!a.hasDeclaredValue()) {
                 booleanAttributes.add(a.getKey());
             }
         }
