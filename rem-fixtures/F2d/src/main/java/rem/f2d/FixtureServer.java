@@ -41,7 +41,9 @@ public class FixtureServer {
         ContextHandlerCollection contexts = new ContextHandlerCollection();
         contexts.addHandler(context("/push-rapid", PushRapidUI.class));
         contexts.addHandler(context("/i09", PushResyncUI.class));
+        contexts.addHandler(context("/i09-theme", PushThemeResyncUI.class));
         contexts.addHandler(context("/i11", GridResizeUI.class));
+        contexts.addHandler(context("/i11-fixed", GridFixedResizeUI.class));
         contexts.addHandler(context("/i29", WindowCurtainUI.class));
         contexts.addHandler(context("/i41-change", UploadChangeUI.class));
         contexts.addHandler(context("/i41-noselect", UploadNoSelectionUI.class));

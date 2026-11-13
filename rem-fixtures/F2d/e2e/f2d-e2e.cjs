@@ -2,7 +2,8 @@
 // the sandbox, by L0). Usage:
 //   node f2d-e2e.cjs <base url, e.g. http://127.0.0.1:18411> <label> <output dir>
 // Environment: F2D_PLAYWRIGHT (path of the playwright package), F2D_CHROMIUM
-// (Chromium executable). Every request to a host other than the fixture is
+// (Chromium executable), F2D_SCENARIOS (optional, comma separated ids: only
+// those scenarios run). Every request to a host other than the fixture is
 // aborted and recorded as a violation. Writes <output dir>/results-<label>.json
 // and exits 0 when the checks ran (whatever their outcome), 3 on a violation,
 // 4 on an internal error.
@@ -62,7 +63,10 @@ async function text(page, selector) {
   return page.$eval(selector, (e) => e.textContent.trim()).catch(() => null);
 }
 
+const ONLY = (process.env.F2D_SCENARIOS || '').split(',').map((x) => x.trim()).filter((x) => x);
+
 async function scenario(browser, id, item, expectation, viewport, body) {
+  if (ONLY.length > 0 && !ONLY.includes(id)) return;
   const started = Date.now();
   const { context, page, logs } = await open(browser, id, viewport);
   const details = [];
@@ -171,6 +175,226 @@ async function pushResync(page, d) {
   return t2 > t1 && pongs === '3';
 }
 
+// I09, second scenario: resynchronization triggered by a theme change (no
+// missing message) while push messages arrive every 100 ms and the user
+// clicks; the resync request is held 2 s in the browser, so the clicks reach
+// the server first. Push must keep working afterwards and a new request must
+// be answered; resynchronizations must not repeat.
+async function pushThemeResync(page, d) {
+  let resyncs = 0;
+  let heldAt = null;
+  let releasedAt = null;
+  await page.route((url) => url.pathname.includes('/UIDL'), async (route) => {
+    const data = route.request().postData() || '';
+    if (/"resynchronize"\s*:\s*true/.test(data)) {
+      resyncs++;
+      if (heldAt === null) {
+        heldAt = Date.now();
+        await sleep(2000);
+        releasedAt = Date.now();
+      }
+    }
+    return route.fallback();
+  });
+  await gotoUi(page, 'i09-theme');
+  await page.click('#start');
+  const startEnd = Date.now() + 10000;
+  while (Date.now() < startEnd && Number(await text(page, '#tick')) < 5) await sleep(100);
+  await page.click('#theme');
+  const resyncEnd = Date.now() + 6000;
+  while (heldAt === null && Date.now() < resyncEnd) await sleep(20);
+  if (heldAt === null) {
+    d.push('INCONCLUSIVE', 'the theme change did not trigger a resynchronization');
+    return false;
+  }
+  for (let i = 0; i < 3; i++) {
+    await sleep(150);
+    await page.click('#ping').catch(() => {});
+  }
+  while (releasedAt === null) await sleep(50);
+  await sleep(3000);
+  const pongsBefore = Number(await text(page, '#pongs'));
+  const t1 = Number(await text(page, '#tick'));
+  await sleep(5000);
+  const t2 = Number(await text(page, '#tick'));
+  await page.click('#ping').catch(() => {});
+  let pongsAfter = pongsBefore;
+  const pongEnd = Date.now() + 8000;
+  while (Date.now() < pongEnd) {
+    pongsAfter = Number(await text(page, '#pongs'));
+    if (pongsAfter > pongsBefore) break;
+    await sleep(200);
+  }
+  await sleep(3000);
+  d.push(`resync requests=${resyncs}`, `tick after resync ${t1} -> ${t2}`, `pongs before last ping=${pongsBefore}`, `after=${pongsAfter}`);
+  return t2 > t1 && pongsAfter > pongsBefore && resyncs <= 3;
+}
+
+// I09, third scenario: a push message that is late rather than lost. The
+// long-polling response carrying it is held 8 s; a click meanwhile produces a
+// newer message, the client gives up waiting (5 s) and resynchronizes; the
+// resync request is held 3 s, and the late message arrives during the
+// resynchronization.
+async function pushLateResync(page, d) {
+  let armed = false;
+  let heldMessage = null;
+  let resyncAt = null;
+  let resyncs = 0;
+  await page.route((url) => url.pathname.endsWith('/PUSH') || url.pathname.includes('/PUSH/'), async (route) => {
+    if (route.request().method() !== 'GET' || !armed || heldMessage) return route.fallback();
+    const response = await route.fetch();
+    const body = await response.text();
+    if (body.includes('"syncId"')) {
+      heldMessage = new Date().toISOString();
+      await sleep(8000);
+    }
+    return route.fulfill({ response, body });
+  });
+  await page.route((url) => url.pathname.includes('/UIDL'), async (route) => {
+    const data = route.request().postData() || '';
+    if (/"resynchronize"\s*:\s*true/.test(data)) {
+      resyncs++;
+      if (resyncAt === null) {
+        resyncAt = Date.now();
+        await sleep(3000);
+      }
+    }
+    return route.fallback();
+  });
+  await gotoUi(page, 'i09');
+  await page.click('#start');
+  const startEnd = Date.now() + 10000;
+  while (Date.now() < startEnd && Number(await text(page, '#tick')) < 3) await sleep(100);
+  armed = true;
+  const holdEnd = Date.now() + 5000;
+  while (!heldMessage && Date.now() < holdEnd) await sleep(50);
+  if (!heldMessage) {
+    d.push('INCONCLUSIVE', 'no push message could be held');
+    return false;
+  }
+  await sleep(500);
+  await page.click('#ping').catch(() => {});
+  const resyncEnd = Date.now() + 9000;
+  while (resyncAt === null && Date.now() < resyncEnd) await sleep(50);
+  if (resyncAt === null) {
+    d.push('INCONCLUSIVE', 'the client did not resynchronize');
+    return false;
+  }
+  await sleep(500);
+  await page.click('#ping').catch(() => {});
+  await sleep(8000);
+  const t1 = Number(await text(page, '#tick'));
+  const pongsBefore = Number(await text(page, '#pongs'));
+  await sleep(4000);
+  const t2 = Number(await text(page, '#tick'));
+  await page.click('#ping').catch(() => {});
+  let pongsAfter = pongsBefore;
+  const pongEnd = Date.now() + 8000;
+  while (Date.now() < pongEnd) {
+    pongsAfter = Number(await text(page, '#pongs'));
+    if (pongsAfter > pongsBefore) break;
+    await sleep(200);
+  }
+  d.push(`held=${heldMessage}`, `resync requests=${resyncs}`, `tick ${t1} -> ${t2}`, `pongs ${pongsBefore} -> ${pongsAfter}`);
+  return t2 > t1 && pongsAfter > pongsBefore && resyncs <= 3;
+}
+
+// I11 invariant: every visible body row shows the item that belongs to its
+// position (row top = body top + index * row height - scrollTop), rows are
+// consecutive and without duplicates.
+async function gridState(page) {
+  return page.$eval('#grid', (grid) => {
+    const wrapper = grid.querySelector('.v-grid-tablewrapper').getBoundingClientRect();
+    const header = grid.querySelector('.v-grid-header').getBoundingClientRect();
+    const scroller = grid.querySelector('.v-grid-scroller-vertical');
+    const all = Array.from(grid.querySelectorAll('.v-grid-body .v-grid-row'));
+    const rh = all.length ? all[0].getBoundingClientRect().height : 0;
+    const vis = all
+      .map((r) => { const b = r.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, text: r.querySelector('.v-grid-cell').textContent.trim() }; })
+      .filter((r) => r.bottom > header.bottom + 1 && r.top < wrapper.bottom - 1)
+      .sort((a, b) => a.top - b.top);
+    const problems = [];
+    let prev = null;
+    for (const r of vis) {
+      const n = Number(r.text.replace('row ', ''));
+      const k = Math.round((r.top - header.bottom + scroller.scrollTop) / rh);
+      if (k !== n) problems.push(`${r.text} at position ${k}`);
+      if (prev !== null && n !== prev + 1) problems.push(`${r.text} after row ${prev}`);
+      prev = n;
+    }
+    return { scrollTop: Math.round(scroller.scrollTop), max: scroller.scrollHeight - scroller.clientHeight, rh, first: vis.length ? vis[0].text : null, last: vis.length ? vis[vis.length - 1].text : null, problems };
+  });
+}
+
+async function gridCheck(page, label, log) {
+  const s = await gridState(page);
+  if (s.problems.length > 0) log.push(`${label}: scrollTop=${s.scrollTop}/${s.max} ${s.first}..${s.last} PROBLEMS ${s.problems.slice(0, 4).join('; ')}`);
+  return s;
+}
+
+const gridScroll = (page, how) => page.$eval('#grid .v-grid-scroller-vertical', (s, how) => {
+  if (how === 'bottom') s.scrollTop = 1000000;
+  else s.scrollTop = Math.max(0, s.scrollTop + how);
+}, how);
+
+// I11, stronger: several window shrinks from a scroll at the bottom, then
+// scrolling to the bottom, a few rows up and down again, then growing back.
+async function gridResizeSteps(page, d) {
+  const log = [];
+  await gotoUi(page, 'i11');
+  await page.waitForSelector('.v-grid-body .v-grid-row');
+  let checks = 0;
+  for (const delta of [20, 40, 50, 80, 120, 200]) {
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await sleep(700);
+    await gridScroll(page, 'bottom');
+    await sleep(500);
+    await page.setViewportSize({ width: 1000, height: 700 - delta });
+    await sleep(900);
+    const rh = (await gridCheck(page, `shrink ${delta}`, log)).rh;
+    await gridScroll(page, 'bottom'); await sleep(500); await gridCheck(page, `shrink ${delta}, bottom`, log);
+    await gridScroll(page, -3 * rh); await sleep(400); await gridCheck(page, `shrink ${delta}, up 3`, log);
+    await gridScroll(page, 'bottom'); await sleep(400);
+    const last = await gridCheck(page, `shrink ${delta}, bottom again`, log);
+    if (last.last !== 'row 99') log.push(`shrink ${delta}: last visible ${last.last} at the bottom`);
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await sleep(900); await gridCheck(page, `grow back from ${delta}`, log);
+    checks += 5;
+  }
+  d.push(`checks=${checks}`, log.length ? log.slice(0, 6).join(' / ') : 'all rows consistent');
+  return log.length === 0;
+}
+
+// I11, container resized by the server, with 12 columns (horizontal
+// scrollbar): from the bottom, the Grid height goes from 420 px to smaller
+// values and back.
+async function gridContainerResize(page, d) {
+  const log = [];
+  await gotoUi(page, 'i11-fixed');
+  await page.waitForSelector('.v-grid-body .v-grid-row');
+  const setHeight = async (h) => {
+    const n = (await logLines(page)).length;
+    await page.click(`#h-${h}`);
+    await waitForLog(page, (l) => l.length > n, 4000);
+    await sleep(700);
+  };
+  let checks = 0;
+  for (const h of [400, 380, 350, 300, 250]) {
+    await setHeight(420);
+    await gridScroll(page, 'bottom'); await sleep(500);
+    await setHeight(h);
+    const rh = (await gridCheck(page, `height ${h}`, log)).rh;
+    await gridScroll(page, 'bottom'); await sleep(500); await gridCheck(page, `height ${h}, bottom`, log);
+    await gridScroll(page, -2 * rh); await sleep(400); await gridCheck(page, `height ${h}, up 2`, log);
+    await gridScroll(page, 'bottom'); await sleep(400);
+    const last = await gridCheck(page, `height ${h}, bottom again`, log);
+    if (last.last !== 'row 99') log.push(`height ${h}: last visible ${last.last} at the bottom`);
+    checks += 4;
+  }
+  d.push(`checks=${checks}`, log.length ? log.slice(0, 6).join(' / ') : 'all rows consistent');
+  return log.length === 0;
+}
+
 // I11: rows stay consistent after scroll to bottom, resize, scroll again.
 async function gridResize(page, d) {
   await gotoUi(page, 'i11');
@@ -272,7 +496,11 @@ async function uploadNoSelection(page, d) {
   try {
     await scenario(browser, 'push-rapid', 'C4', 'pass on base and candidate', null, pushRapid);
     await scenario(browser, 'i09-resync', 'I09', 'red on base, green on candidate', null, pushResync);
+    await scenario(browser, 'i09-theme-resync', 'I09', 'red on base, green on candidate', null, pushThemeResync);
+    await scenario(browser, 'i09-late-resync', 'I09', 'red on base, green on candidate', null, pushLateResync);
     await scenario(browser, 'i11-grid-resize', 'I11', 'red on base, green on candidate', { width: 1000, height: 600 }, gridResize);
+    await scenario(browser, 'i11-window-steps', 'I11', 'red on base, green on candidate', { width: 1000, height: 700 }, gridResizeSteps);
+    await scenario(browser, 'i11-container', 'I11', 'red on base, green on candidate', { width: 1000, height: 800 }, gridContainerResize);
     await scenario(browser, 'i29-drag', 'I29', 'red on base, green on candidate', null, windowCurtain('#closing-window .v-window-header'));
     await scenario(browser, 'i29-resize', 'I29', 'red on base, green on candidate', null, windowCurtain('#closing-window .v-window-resizebox'));
     await scenario(browser, 'i41-change', 'I41', 'red on base, green on candidate', null, uploadChange);
