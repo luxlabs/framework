@@ -1,6 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: I01, remove the select-all header click handler with the selection column (from Vaadin 8 89fd72ed).
+ * Modified by LuxLabs in 2026: I01, remove the select-all header click handler with the selection column (from Vaadin 8 89fd72ed); I15, add columns at the visible index when columns are hidden (written for the fork).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -6527,6 +6527,15 @@ public class Grid<T> extends ResizeComposite implements HasSelectionHandlers<T>,
         int visibleNewColumns = 0;
         int currentIndex = index;
 
+        // The escalator only has the visible columns: insert the new visible
+        // columns after the visible columns that precede the given index.
+        int visibleIndex = 0;
+        for (int i = 0; i < index; i++) {
+            if (!this.columns.get(i).isHidden()) {
+                visibleIndex++;
+            }
+        }
+
         //prevent updates of hiding toggles.
         //it will be updated finally all at once.
         this.columnHider.hidingColumn = true;
@@ -6546,7 +6555,7 @@ public class Grid<T> extends ResizeComposite implements HasSelectionHandlers<T>,
         }
         if (visibleNewColumns > 0) {
             final ColumnConfiguration columnConfiguration = this.escalator.getColumnConfiguration();
-            columnConfiguration.insertColumns(index, visibleNewColumns);
+            columnConfiguration.insertColumns(visibleIndex, visibleNewColumns);
         }
 
         for (final Column<?, T> column : columnCollection) {
