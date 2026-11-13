@@ -1,6 +1,5 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: REM F2d I34, written for the fork (no Vaadin 8 source).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -157,17 +156,6 @@ public class AtmospherePushConnection implements PushConnection {
      *            false if it is a response to a client request.
      */
     public void push(boolean async) {
-        // REM F2d (I34): push, connect, disconnect and connectionLost may be
-        // called from different threads (e.g. UI.setSession(null) disconnects
-        // without holding the session lock). Writing and sending a message is
-        // done while holding the monitor of this connection so that a
-        // disconnect cannot close or clear the resource in the middle of it.
-        synchronized (this) {
-            pushLocked(async);
-        }
-    }
-
-    private void pushLocked(boolean async) {
         if (!isConnected()) {
             if (async && state != State.RESPONSE_PENDING) {
                 state = State.PUSH_PENDING;
@@ -234,7 +222,7 @@ public class AtmospherePushConnection implements PushConnection {
     }
 
     @Override
-    public synchronized boolean isConnected() {
+    public boolean isConnected() {
         assert state != null;
         assert (state == State.CONNECTED) ^ (resource == null);
         return state == State.CONNECTED;
@@ -257,12 +245,9 @@ public class AtmospherePushConnection implements PushConnection {
             disconnect();
         }
 
-        State oldState;
-        synchronized (this) {
-            this.resource = resource;
-            oldState = state;
-            state = State.CONNECTED;
-        }
+        this.resource = resource;
+        State oldState = state;
+        state = State.CONNECTED;
 
         if (oldState == State.PUSH_PENDING
                 || oldState == State.RESPONSE_PENDING) {
@@ -293,43 +278,28 @@ public class AtmospherePushConnection implements PushConnection {
 
     @Override
     public void disconnect() {
-        AtmosphereResource resourceToClose;
-        Future<Object> lastMessage;
-        // REM F2d (I34): detach the resource while holding the monitor, so
-        // that a concurrent push either completes before (and its message is
-        // waited for below) or finds the connection disconnected and is
-        // deferred. Waiting and closing happen outside the monitor, so that
-        // callbacks of the push library cannot deadlock with a push.
-        synchronized (this) {
-            assert isConnected();
+        assert isConnected();
 
-            if (resource == null) {
-                // Already disconnected. Should not happen but if it does, we
-                // don't want to cause NPEs
-                getLogger().fine(
-                        "AtmospherePushConnection.disconnect() called twice, this should not happen");
-                return;
-            }
-            if (resource.isResumed()) {
-                // This can happen for long polling because of
-                // http://dev.vaadin.com/ticket/16919
-                // Once that is fixed, this should never happen
-                connectionLost();
-                return;
-            }
-
-            resourceToClose = resource;
-            lastMessage = outgoingMessage;
-            outgoingMessage = null;
-            resource = null;
-            state = State.DISCONNECTED;
+        if (resource == null) {
+            // Already disconnected. Should not happen but if it does, we don't
+            // want to cause NPEs
+            getLogger().fine(
+                    "AtmospherePushConnection.disconnect() called twice, this should not happen");
+            return;
+        }
+        if (resource.isResumed()) {
+            // This can happen for long polling because of
+            // http://dev.vaadin.com/ticket/16919
+            // Once that is fixed, this should never happen
+            connectionLost();
+            return;
         }
 
-        if (lastMessage != null) {
+        if (outgoingMessage != null) {
             // Wait for the last message to be sent before closing the
             // connection (assumes that futures are completed in order)
             try {
-                lastMessage.get(1000, TimeUnit.MILLISECONDS);
+                outgoingMessage.get(1000, TimeUnit.MILLISECONDS);
             } catch (TimeoutException e) {
                 getLogger().log(Level.INFO,
                         "Timeout waiting for messages to be sent to client before disconnect");
@@ -337,14 +307,16 @@ public class AtmospherePushConnection implements PushConnection {
                 getLogger().log(Level.INFO,
                         "Error waiting for messages to be sent to client before disconnect");
             }
+            outgoingMessage = null;
         }
 
         try {
-            resourceToClose.close();
+            resource.close();
         } catch (IOException e) {
             getLogger().log(Level.INFO, "Error when closing push connection",
                     e);
         }
+        connectionLost();
     }
 
     /**
@@ -352,7 +324,7 @@ public class AtmospherePushConnection implements PushConnection {
      *
      * @since 7.4.1
      */
-    public synchronized void connectionLost() {
+    public void connectionLost() {
         resource = null;
         if (state == State.CONNECTED) {
             // Guard against connectionLost being (incorrectly) called when
@@ -366,7 +338,7 @@ public class AtmospherePushConnection implements PushConnection {
     /**
      * Returns the state of this connection.
      */
-    protected synchronized State getState() {
+    protected State getState() {
         return state;
     }
 
