@@ -2,11 +2,13 @@
 //
 // F2b browser checks (Chromium only): M05 action captions (Table, Tree,
 // shortcut), M03 Grid header captions in the column hiding toggles.
-// usage: node test.js <playwright module dir> <port> <label> <output json>
+// usage: node test.js <playwright module dir> <port> <label> <output json> <chromium executable>
+// The Chromium executable is given explicitly (headless shell of the cache);
+// Playwright never resolves or downloads a browser by itself.
 // Only http://127.0.0.1:<port> is reachable: every other request is aborted
 // and recorded as a violation.
 'use strict';
-const [, , pwDir, port, label, outFile] = process.argv;
+const [, , pwDir, port, label, outFile, chromiumPath] = process.argv;
 const { chromium } = require(pwDir);
 const fs = require('fs');
 const origin = `http://127.0.0.1:${port}`;
@@ -37,7 +39,9 @@ async function contextMenu(page, cellText) {
 }
 
 (async () => {
+  if (!chromiumPath) { throw new Error('chromium executable path missing'); }
   const browser = await chromium.launch({
+    executablePath: chromiumPath,
     headless: true,
     args: [
       '--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1',
