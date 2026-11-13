@@ -1,6 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
- * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f); I44, popup position with the menu margin, border and padding (from Vaadin 8 f1dc01ec).
+ * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f); I44, popup position with the menu margin, border and padding (from Vaadin 8 f1dc01ec); I40, fewer popup position resets (from Vaadin 8 a8310a63).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -431,11 +431,17 @@ public class VFilterSelect extends Composite
                     getElement().setId("VAADIN_COMBOBOX_OPTIONLIST");
 
                     menu.setSuggestions(currentSuggestions);
-                    leftPosition = getDesiredLeftPosition();
 
-                    topPosition = getDesiredTopPosition();
+                    // Set the default position if the popup isn't already
+                    // visible, the setPopupPositionAndShow call later on can
+                    // deal with any adjustments that might be needed
+                    if (!popup.isShowing()) {
+                        leftPosition = getDesiredLeftPosition();
 
-                    setPopupPosition(leftPosition, topPosition);
+                        topPosition = getDesiredTopPosition();
+
+                        setPopupPosition(leftPosition, topPosition);
+                    }
 
                     int nullOffset = (nullSelectionAllowed
                             && "".equals(lastFilter) ? 1 : 0);
@@ -906,20 +912,28 @@ public class VFilterSelect extends Composite
                 }
             }
 
+            if (offsetWidth + menuMarginBorderPaddingWidth
+                    + left < VFilterSelect.this.getAbsoluteLeft()
+                            + VFilterSelect.this.getOffsetWidth()) {
+                // Popup doesn't reach all the way to the end of the input
+                // field, filtering may have changed the popup width.
+                left = VFilterSelect.this.getAbsoluteLeft();
+            }
             if (offsetWidth + menuMarginBorderPaddingWidth + left > Window
                     .getClientWidth()) {
+                // Popup doesn't fit the view, needs to be opened to the left
+                // instead.
                 left = VFilterSelect.this.getAbsoluteLeft()
                         + VFilterSelect.this.getOffsetWidth() - offsetWidth
                         - (int) menuMarginBorderPaddingWidth;
-                if (left < 0) {
-                    left = 0;
-                    menu.setWidth(Window.getClientWidth() + "px");
-
-                }
                 if (BrowserInfo.get().isIE()
                         && BrowserInfo.get().getBrowserMajorVersion() < 10) {
                     setTdWidth(menu.getElement(), Window.getClientWidth() - 8);
                 }
+            }
+            if (left < 0) {
+                left = 0;
+                menu.setWidth(Window.getClientWidth() + "px");
             }
 
             setPopupPosition(left, top);
