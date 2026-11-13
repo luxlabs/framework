@@ -41,7 +41,17 @@ public class FixtureServer {
         ContextHandlerCollection contexts = new ContextHandlerCollection();
         contexts.addHandler(context("/push-rapid", PushRapidUI.class));
         contexts.addHandler(context("/i09", PushResyncUI.class));
-        contexts.addHandler(context("/i09-theme", PushThemeResyncUI.class));
+        Diag.captureVaadinPushLog();
+        ServletContextHandler themeContext = context("/i09-theme",
+                PushThemeResyncUI.class);
+        // Diagnostics: Atmosphere interceptor of the fixture (init parameter
+        // org.atmosphere.cpr.AtmosphereInterceptor), only on this context
+        themeContext.getServletHandler().getServlet("PushThemeResyncUI")
+                .setInitParameter("org.atmosphere.cpr.AtmosphereInterceptor",
+                        DiagInterceptor.class.getName());
+        themeContext.addServlet(new ServletHolder("diag", new Diag.Servlet()),
+                "/diag");
+        contexts.addHandler(themeContext);
         contexts.addHandler(context("/i11", GridResizeUI.class));
         contexts.addHandler(context("/i11-fixed", GridFixedResizeUI.class));
         contexts.addHandler(context("/i29", WindowCurtainUI.class));

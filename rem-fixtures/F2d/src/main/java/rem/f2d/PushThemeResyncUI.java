@@ -18,6 +18,7 @@ package rem.f2d;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.vaadin.annotations.Push;
+import com.vaadin.server.VaadinRequest;
 import com.vaadin.shared.communication.PushMode;
 import com.vaadin.shared.ui.ui.Transport;
 import com.vaadin.ui.Button;
@@ -33,6 +34,26 @@ import com.vaadin.ui.Label;
 @Push(value = PushMode.AUTOMATIC, transport = Transport.LONG_POLLING)
 public class PushThemeResyncUI extends LogUI {
 
+    /** Repetition tag from the "rep" request parameter, for {@link Diag}. */
+    private String rep = "none";
+
+    @Override
+    protected void init(VaadinRequest request) {
+        String r = request.getParameter("rep");
+        if (r == null && getPage().getLocation() != null
+                && getPage().getLocation().getQuery() != null) {
+            for (String kv : getPage().getLocation().getQuery().split("&")) {
+                if (kv.startsWith("rep=")) {
+                    r = kv.substring(4);
+                }
+            }
+        }
+        if (r != null && r.matches("[A-Za-z0-9._-]{1,40}")) {
+            rep = r;
+        }
+        super.init(request);
+    }
+
     @Override
     protected void setup() {
         final Label tick = new Label("0");
@@ -46,8 +67,10 @@ public class PushThemeResyncUI extends LogUI {
                     final int value = i;
                     try {
                         Thread.sleep(100);
-                        access(() -> tick.setValue(String.valueOf(value)))
-                                .get();
+                        access(() -> {
+                            tick.setValue(String.valueOf(value));
+                            Diag.record(rep, this, "tick=" + value);
+                        }).get();
                     } catch (Exception ex) {
                         return;
                     }
@@ -57,11 +80,15 @@ public class PushThemeResyncUI extends LogUI {
             t.start();
         });
         start.setId("start");
-        Button ping = new Button("ping",
-                e -> pongs.setValue(String.valueOf(pongCount.incrementAndGet())));
+        Button ping = new Button("ping", e -> {
+            pongs.setValue(String.valueOf(pongCount.incrementAndGet()));
+            Diag.record(rep, this, "ping=" + pongCount.get());
+        });
         ping.setId("ping");
-        Button theme = new Button("theme",
-                e -> setTheme("valo".equals(getTheme()) ? "reindeer" : "valo"));
+        Button theme = new Button("theme", e -> {
+            setTheme("valo".equals(getTheme()) ? "reindeer" : "valo");
+            Diag.record(rep, this, "theme=" + getTheme());
+        });
         theme.setId("theme");
         layout.addComponents(tick, pongs, start, ping, theme);
     }

@@ -3,7 +3,8 @@
 //   node f2d-e2e.cjs <base url, e.g. http://127.0.0.1:18411> <label> <output dir>
 // Environment: F2D_PLAYWRIGHT (path of the playwright package), F2D_CHROMIUM
 // (Chromium executable), F2D_SCENARIOS (optional, comma separated ids: only
-// those scenarios run). Every request to a host other than the fixture is
+// those scenarios run), F2D_REPEAT (optional, "id=n,…": run scenario id n
+// times, as id-r1 … id-rn). Every request to a host other than the fixture is
 // aborted and recorded as a violation. Writes <output dir>/results-<label>.json
 // and exits 0 when the checks ran (whatever their outcome), 3 on a violation,
 // 4 on an internal error.
@@ -38,8 +39,8 @@ async function open(browser, name, viewport) {
   return { context, page, logs };
 }
 
-async function gotoUi(page, ctx) {
-  await page.goto(`${BASE}/${ctx}/`, { waitUntil: 'load' });
+async function gotoUi(page, ctx, query) {
+  await page.goto(`${BASE}/${ctx}/${query ? '?' + query : ''}`, { waitUntil: 'load' });
   await page.waitForSelector('#log', { state: 'attached', timeout: 30000 });
   await sleep(500);
 }
@@ -64,16 +65,28 @@ async function text(page, selector) {
 }
 
 const ONLY = (process.env.F2D_SCENARIOS || '').split(',').map((x) => x.trim()).filter((x) => x);
+const REPEAT = {};
+for (const kv of (process.env.F2D_REPEAT || '').split(',').map((x) => x.trim()).filter((x) => x)) {
+  const [k, v] = kv.split('=');
+  REPEAT[k] = Math.max(1, Math.min(20, Number(v) || 1));
+}
 
 async function scenario(browser, id, item, expectation, viewport, body) {
   if (ONLY.length > 0 && !ONLY.includes(id)) return;
+  const n = REPEAT[id] || 1;
+  for (let i = 1; i <= n; i++) {
+    await runScenario(browser, n > 1 ? `${id}-r${i}` : id, item, expectation, viewport, body);
+  }
+}
+
+async function runScenario(browser, id, item, expectation, viewport, body) {
   const started = Date.now();
   const { context, page, logs } = await open(browser, id, viewport);
   const details = [];
   let passed = false;
   let error = null;
   try {
-    passed = await body(page, details);
+    passed = await body(page, details, id, logs);
   } catch (e) {
     error = String(e && e.stack ? e.stack : e);
   }
@@ -180,7 +193,47 @@ async function pushResync(page, d) {
 // clicks; the resync request is held 2 s in the browser, so the clicks reach
 // the server first. Push must keep working afterwards and a new request must
 // be answered; resynchronizations must not repeat.
-async function pushThemeResync(page, d) {
+// Diagnostics of one repetition: push messages received by the client
+// (onMessage logs "Received push"), sync ids of XHR responses, long polling
+// requests opened, finished, failed and still pending, and the server-side
+// lines of Diag (sync id written, push connection and resource state).
+function trackLongPolling(page) {
+  const lp = { opened: 0, finished: 0, failed: 0, pending: new Map() };
+  const isPush = (r) => r.method() === 'GET' && new URL(r.url()).pathname.endsWith('/PUSH');
+  page.on('request', (r) => { if (isPush(r)) { lp.opened++; lp.pending.set(r, Date.now()); } });
+  page.on('requestfinished', (r) => { if (isPush(r)) { lp.finished++; lp.pending.delete(r); } });
+  page.on('requestfailed', (r) => { if (isPush(r)) { lp.failed++; lp.pending.delete(r); } });
+  return lp;
+}
+
+async function diagnostics(page, d, tag, logs, lp) {
+  const ids = (re) => logs.map((l) => { const m = l.match(re); return m ? Number(m[1]) : null; }).filter((x) => x !== null);
+  const pushIds = ids(/Received push \([^)]*\) message: for\(;;\);\[\{"syncId": (\d+)/);
+  const xhrIds = ids(/Received xhr message: for\(;;\);\[\{"syncId": (\d+)/);
+  const now = Date.now();
+  const pendingAges = Array.from(lp.pending.values()).map((t) => now - t);
+  let server = '';
+  try {
+    const res = await page.request.get(`${BASE}/i09-theme/diag?rep=${encodeURIComponent(tag)}`);
+    server = await res.text();
+  } catch (e) {
+    server = 'diag error: ' + e;
+  }
+  fs.writeFileSync(path.join(OUT, `${LABEL}-${tag}-server-diag.txt`), server);
+  const lines = server.split('\n').filter((l) => l.trim());
+  const resumedConnected = lines.filter((l) => /state=CONNECTED/.test(l) && /resumed=true/.test(l)).length;
+  const disconnected = lines.filter((l) => /connected=false/.test(l)).length;
+  d.push(`client push received=${pushIds.length} last push syncId=${pushIds.length ? pushIds[pushIds.length - 1] : '-'} last xhr syncId=${xhrIds.length ? xhrIds[xhrIds.length - 1] : '-'}`);
+  d.push(`long polling GET opened=${lp.opened} finished=${lp.finished} failed=${lp.failed} pending=${pendingAges.length}${pendingAges.length ? ' (age ' + pendingAges.map((a) => Math.round(a / 100) / 10 + ' s').join(', ') + ')' : ''}`);
+  const count = (re) => lines.filter((l) => re.test(l)).length;
+  const lastTick = lines.filter((l) => / tick=/.test(l)).pop() || '';
+  d.push(`server ticks=${count(/ tick=/)} last syncId=${(lastTick.match(/syncId=(\d+)/) || [])[1] || '-'} ticks connected with resumed resource=${resumedConnected} ticks disconnected=${disconnected} last tick=[${lastTick.replace(/^t=\d+ /, '')}]`);
+  d.push(`server events: GET=${count(/atmo request GET/)} new push connection=${count(/New push connection/)} connection closed=${count(/Connection (unexpectedly )?closed/)} atmo suspend=${count(/atmo suspend/)} resume=${count(/atmo resume/)} broadcast=${count(/atmo broadcast/)} close=${count(/atmo close/)} disconnect=${count(/atmo disconnect/)}`);
+}
+
+async function pushThemeResync(page, d, id, logs) {
+  const tag = `${LABEL}-${id}`.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 40);
+  const lp = trackLongPolling(page);
   let resyncs = 0;
   let heldAt = null;
   let releasedAt = null;
@@ -196,7 +249,7 @@ async function pushThemeResync(page, d) {
     }
     return route.fallback();
   });
-  await gotoUi(page, 'i09-theme');
+  await gotoUi(page, 'i09-theme', `rep=${tag}`);
   await page.click('#start');
   const startEnd = Date.now() + 10000;
   while (Date.now() < startEnd && Number(await text(page, '#tick')) < 5) await sleep(100);
@@ -205,6 +258,7 @@ async function pushThemeResync(page, d) {
   while (heldAt === null && Date.now() < resyncEnd) await sleep(20);
   if (heldAt === null) {
     d.push('INCONCLUSIVE', 'the theme change did not trigger a resynchronization');
+    await diagnostics(page, d, tag, logs, lp);
     return false;
   }
   for (let i = 0; i < 3; i++) {
@@ -227,6 +281,7 @@ async function pushThemeResync(page, d) {
   }
   await sleep(3000);
   d.push(`resync requests=${resyncs}`, `tick after resync ${t1} -> ${t2}`, `pongs before last ping=${pongsBefore}`, `after=${pongsAfter}`);
+  await diagnostics(page, d, tag, logs, lp);
   return t2 > t1 && pongsAfter > pongsBefore && resyncs <= 3;
 }
 
