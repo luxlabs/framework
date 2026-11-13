@@ -147,7 +147,8 @@ async function keyboard(page, d) {
 async function autocomplete(page, d) {
   const combo = await page.$eval('#combo-auto input', (e) => e.getAttribute('autocomplete')).catch(() => null);
   const date = await page.$eval('#date-auto input', (e) => e.getAttribute('autocomplete')).catch(() => null);
-  d.push(`combo autocomplete=${combo}`, `date autocomplete=${date}`);
+  const ua = await page.evaluate(() => navigator.userAgent);
+  d.push(`combo autocomplete=${combo}`, `date autocomplete=${date}`, `user agent=${ua}`);
   return combo === 'off' && date === 'off';
 }
 
@@ -160,7 +161,7 @@ async function popupRect(page) {
   });
 }
 
-// I44: popup opened to the left at the right edge stays inside the view.
+// I44 (no correction, non regression): popup opened to the left at the right edge stays inside the view.
 async function popupLeft(page, d) {
   await page.click('#combo-right .v-filterselect-button');
   await page.waitForSelector('.v-filterselect-suggestpopup', { timeout: 5000 });
@@ -202,7 +203,7 @@ async function popupPositions(page, d) {
   return afterOpen.length > 0 && afterFiltering.length <= 1;
 }
 
-// I14 (reproduction): typing fast and tabbing out selects or adds the value.
+// I14: typing fast and tabbing out selects or adds the value.
 async function fastTab(page, d) {
   await page.click('#combo-new input');
   await page.keyboard.type('Omega', { delay: 0 });
@@ -216,7 +217,7 @@ async function fastTab(page, d) {
   return added !== null && selected !== null;
 }
 
-// I42 (reproduction): the popup follows the field when the page scrolls.
+// I42 (no correction, non regression): the popup follows the field when the page scrolls.
 async function popupScroll(page, d) {
   await page.click('#combo-scroll .v-filterselect-button');
   await page.waitForSelector('.v-filterselect-suggestpopup', { timeout: 5000 });
@@ -268,7 +269,7 @@ async function tableSelect(page, d) {
   return sel.length >= 5 && text.includes(sel.trim());
 }
 
-// I46 (reproduction): text selection inside one Grid cell survives and stays in the cell.
+// I46: text selection inside one Grid cell survives and stays in the cell.
 function gridSelect(id) {
   return async (page, d) => {
     const cell = `#${id} .v-grid-body .v-grid-row:nth-child(1) .v-grid-cell:nth-child(1)`;
@@ -304,7 +305,7 @@ async function gridToggles(page, d) {
     && r.texts.filter((t) => t.includes('<img class="f2c-toggle-img"')).length === 2;
 }
 
-// I01: sorting works after enabling and disabling multi-selection twice.
+// I01 (no correction, non regression): sorting works after enabling and disabling multi-selection twice.
 async function gridSort(page, d) {
   for (const [button, line] of [['#mode-multi', 'mode=multi'], ['#mode-none', 'mode=none'], ['#mode-multi', 'mode=multi'], ['#mode-none', 'mode=none']]) {
     const before = (await logLines(page)).filter((s) => s === line).length;
@@ -364,20 +365,19 @@ async function responsive(page, d, logs) {
   try {
     const RG = 'red on base, green on candidate';
     const GG = 'green on base and candidate';
-    const REPRO = 'reproduction on base (no correction yet)';
-    const RES = 'red on base, green on candidate (with reserve)';
+    const NOREG = 'green on base and candidate (no correction: defect not reproduced on 7.7.17)';
     await scenario(browser, 'i05-panel', 'I05/M04', RG, null, 'panel', panelCaption);
     await scenario(browser, 'i02-keyboard', 'I02', GG, null, 'keyboard', keyboard);
     await scenario(browser, 'i03-autocomplete', 'I03', RG, null, 'combo', autocomplete);
-    await scenario(browser, 'i44-popup-left', 'I44', RES, null, 'combo', popupLeft);
-    await scenario(browser, 'i40-popup-positions', 'I40', RES, null, 'combo', popupPositions);
-    await scenario(browser, 'i14-fast-tab', 'I14', REPRO, null, 'combo', fastTab);
-    await scenario(browser, 'i42-popup-scroll', 'I42', REPRO, null, 'combo', popupScroll);
+    await scenario(browser, 'i44-popup-left', 'I44', NOREG, null, 'combo', popupLeft);
+    await scenario(browser, 'i40-popup-positions', 'I40', RG, null, 'combo', popupPositions);
+    await scenario(browser, 'i14-fast-tab', 'I14', RG, null, 'combo', fastTab);
+    await scenario(browser, 'i42-popup-scroll', 'I42', NOREG, null, 'combo', popupScroll);
     await scenario(browser, 'i10-table-select', 'I10', RG, null, 'table', tableSelect);
-    await scenario(browser, 'i46-grid-select-none', 'I46', REPRO, null, 'grid', gridSelect('grid-text-none'));
-    await scenario(browser, 'i46-grid-select-single', 'I46', REPRO, null, 'grid', gridSelect('grid-text-single'));
+    await scenario(browser, 'i46-grid-select-none', 'I46', RG, null, 'grid', gridSelect('grid-text-none'));
+    await scenario(browser, 'i46-grid-select-single', 'I46', RG, null, 'grid', gridSelect('grid-text-single'));
     await scenario(browser, 'm03-grid-toggles', 'M03', RG, null, 'grid', gridToggles);
-    await scenario(browser, 'i01-grid-sort', 'I01', RES, null, 'grid', gridSort);
+    await scenario(browser, 'i01-grid-sort', 'I01', NOREG, null, 'grid', gridSort);
     await scenario(browser, 'i15-grid-add-column', 'I15', RG, null, 'grid', gridAddColumn);
     await scenario(browser, 'i55-responsive', 'I55', RG, null, 'responsive', responsive);
   } finally {
