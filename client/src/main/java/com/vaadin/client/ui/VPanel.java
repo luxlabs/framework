@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: I05/M04, caption as text unless captionAsHtml (from Vaadin 8 0035aa1d).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -132,8 +133,12 @@ public class VPanel extends SimplePanel
     }
 
     /** For internal use only. May be removed or replaced in the future. */
-    public void setCaption(String text) {
-        DOM.setInnerHTML(captionText, text);
+    public void setCaption(String text, boolean captionAsHtml) {
+        if (captionAsHtml) {
+            captionText.setInnerHTML(text);
+        } else {
+            captionText.setInnerText(text);
+        }
     }
 
     /** For internal use only. May be removed or replaced in the future. */
