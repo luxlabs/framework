@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: REM F2d I29, from Vaadin 8 e65e9c5821 (#10515).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -285,6 +286,12 @@ public class VWindow extends VOverlay implements ShortcutActionHandlerOwner,
                 .focusStoredElement();
 
         removeTabBlockHandlers();
+        // If you click while the window is being closed,
+        // a new dragging curtain might be added and will
+        // remain after detach. Theoretically a resize curtain can also remain
+        // if you manage to click on the resize element
+        hideDraggingCurtain();
+        hideResizingCurtain();
     }
 
     private void addTabBlockHandlers() {

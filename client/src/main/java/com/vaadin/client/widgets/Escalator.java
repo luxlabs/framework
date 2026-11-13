@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: REM F2d I11, from Vaadin 8 a967bd7fdc (#12003).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -3770,6 +3771,7 @@ public class Escalator extends Widget
                                 visualRowOrder.getLast()) + 1;
                         moveAndUpdateEscalatorRows(Range.withOnly(0),
                                 visualRowOrder.size(), newLogicalIndex);
+                        updateTopRowLogicalIndex(1);
                     }
                 }
             }

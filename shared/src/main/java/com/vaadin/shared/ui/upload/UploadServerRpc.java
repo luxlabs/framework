@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: REM F2d I41, javadoc from Vaadin 8 240cdce985 (#11939).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -17,6 +18,9 @@ package com.vaadin.shared.ui.upload;
 
 import com.vaadin.shared.communication.ServerRpc;
 
+/**
+ * Client-to-server RPC interface for Upload.
+ */
 public interface UploadServerRpc extends ServerRpc {
 
     /**

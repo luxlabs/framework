@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: REM F2d I41, from Vaadin 8 f4dc8b2952 (#11936) and 240cdce985 (#11939).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -23,6 +24,8 @@ import com.google.gwt.dom.client.DivElement;
 import com.google.gwt.dom.client.Document;
 import com.google.gwt.dom.client.Element;
 import com.google.gwt.dom.client.FormElement;
+import com.google.gwt.event.dom.client.ChangeEvent;
+import com.google.gwt.event.dom.client.ChangeHandler;
 import com.google.gwt.event.dom.client.ClickEvent;
 import com.google.gwt.event.dom.client.ClickHandler;
 import com.google.gwt.user.client.Command;
@@ -41,6 +44,7 @@ import com.vaadin.client.StyleConstants;
 import com.vaadin.client.VConsole;
 import com.vaadin.client.ui.upload.UploadConnector;
 import com.vaadin.client.ui.upload.UploadIFrameOnloadStrategy;
+import com.vaadin.shared.EventId;
 import com.vaadin.shared.ui.upload.UploadServerRpc;
 
 /**
@@ -56,8 +60,7 @@ public class VUpload extends SimplePanel {
         public void onBrowserEvent(Event event) {
             super.onBrowserEvent(event);
             if (event.getTypeInt() == Event.ONCHANGE) {
-                if (immediate && fu.getFilename() != null
-                        && !"".equals(fu.getFilename())) {
+                if (immediate && hasFilename()) {
                     submit();
                 }
             } else if (BrowserInfo.get().isIE()
@@ -120,6 +123,15 @@ public class VUpload extends SimplePanel {
 
     private boolean immediate;
 
+    /**
+     * Just-in-case option to override the default assumption that if no file
+     * has been selected, no upload attempt should happen. Not part of public
+     * API so can be removed without a warning -- if you have an actual need for
+     * this feature (which is currently only accessible through violator
+     * pattern), let us know.
+     */
+    private boolean allowUploadWithoutFilename = false;
+
     private Hidden maxfilesize = new Hidden();
 
     /** For internal use only. May be removed or replaced in the future. */
@@ -140,6 +152,7 @@ public class VUpload extends SimplePanel {
         setWidget(panel);
         panel.add(maxfilesize);
         panel.add(fu);
+        fu.addChangeHandler(new FileUploadChangeHandler());
         submitButton = new VButton();
         submitButton.addClickHandler(new ClickHandler() {
             @Override
@@ -172,6 +185,7 @@ public class VUpload extends SimplePanel {
                 fu.sinkEvents(Event.ONCHANGE);
                 fu.sinkEvents(Event.ONFOCUS);
             }
+            updateEnabledForSubmitButton();
         }
         setStyleName(getElement(), CLASSNAME + "-immediate", immediate);
     }
@@ -188,20 +202,20 @@ public class VUpload extends SimplePanel {
 
     /** For internal use only. May be removed or replaced in the future. */
     public void disableUpload() {
-        setEnabledForSubmitButton(false);
         if (!submitted) {
             // Cannot disable the fileupload while submitting or the file won't
             // be submitted at all
             fu.getElement().setPropertyBoolean("disabled", true);
         }
         enabled = false;
+        updateEnabledForSubmitButton();
     }
 
     /** For internal use only. May be removed or replaced in the future. */
     public void enableUpload() {
-        setEnabledForSubmitButton(true);
         fu.getElement().setPropertyBoolean("disabled", false);
         enabled = true;
+        updateEnabledForSubmitButton();
         if (submitted) {
             /*
              * An old request is still in progress (most likely cancelled),
@@ -214,9 +228,50 @@ public class VUpload extends SimplePanel {
         }
     }
 
-    private void setEnabledForSubmitButton(boolean enabled) {
-        submitButton.setEnabled(enabled);
-        submitButton.setStyleName(StyleConstants.DISABLED, !enabled);
+    /**
+     * Updates the enabled status for submit button. If the widget itself is
+     * disabled, so is the submit button. It must also follow overall enabled
+     * status in immediate mode, otherwise you cannot select a file at all. In
+     * non-immediate mode there is another button for selecting the file, so the
+     * submit button should be disabled until a file has been selected, unless
+     * upload without selection has been specifically allowed.
+     */
+    private void updateEnabledForSubmitButton() {
+        if (enabled && (immediate || hasFilename()
+                || allowUploadWithoutFilename)) {
+            submitButton.setEnabled(true);
+            submitButton.setStyleName(StyleConstants.DISABLED, false);
+        } else {
+            submitButton.setEnabled(false);
+            submitButton.setStyleName(StyleConstants.DISABLED, true);
+        }
+    }
+
+    private boolean hasFilename() {
+        return fu.getFilename() != null && !fu.getFilename().isEmpty();
+    }
+
+    /**
+     * Change handler of the file input: updates the submit button and notifies
+     * the server-side change listeners. Added again to every new file input
+     * created by {@link #rebuildPanel()}, so that the change listener keeps
+     * working after the first upload.
+     */
+    private class FileUploadChangeHandler implements ChangeHandler {
+        @Override
+        public void onChange(ChangeEvent event) {
+            if (!immediate) {
+                updateEnabledForSubmitButton();
+            }
+            if (client != null) {
+                UploadConnector connector = ((UploadConnector) ConnectorMap
+                        .get(client).getConnector(VUpload.this));
+                if (connector.hasEventListener(EventId.CHANGE)) {
+                    connector.getRpcProxy(UploadServerRpc.class)
+                            .change(fu.getFilename());
+                }
+            }
+        }
     }
 
     /**
@@ -234,6 +289,7 @@ public class VUpload extends SimplePanel {
         if (immediate) {
             fu.sinkEvents(Event.ONCHANGE);
         }
+        fu.addChangeHandler(new FileUploadChangeHandler());
     }
 
     /**
@@ -315,7 +371,10 @@ public class VUpload extends SimplePanel {
             VConsole.log("Submit cancelled (disabled or already submitted)");
             return;
         }
-        if (fu.getFilename().length() == 0) {
+        if (!hasFilename()) {
+            if (!allowUploadWithoutFilename) {
+                return;
+            }
             VConsole.log("Submitting empty selection (no file)");
         }
         // flush possibly pending variable changes, so they will be handled

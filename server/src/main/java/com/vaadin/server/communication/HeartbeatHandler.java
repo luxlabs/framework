@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: REM F2d I56, from Vaadin 8 5fa144193c (#11556) and 477e9fe824 (#11859).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -89,7 +90,14 @@ public class HeartbeatHandler extends SynchronizedRequestHandler
             return false;
         }
 
-        response.sendError(HttpServletResponse.SC_GONE, "Session expired");
+        // Ensure that the browser does not cache expired heartbeat responses.
+        // iOS 6 Safari requires this (#3226)
+        response.setHeader("Cache-Control", "no-cache");
+        // If Content-Type is not set, browsers assume text/html and may
+        // complain about the empty response body (#4167)
+        response.setHeader("Content-Type", "text/plain");
+
+        response.sendError(HttpServletResponse.SC_FORBIDDEN, "Session expired");
         return true;
     }
 }

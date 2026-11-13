@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: REM F2d I41, from Vaadin 8 240cdce985 (#11939).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -16,18 +17,14 @@
 
 package com.vaadin.client.ui.upload;
 
-import com.google.gwt.event.dom.client.ChangeEvent;
-import com.google.gwt.event.dom.client.ChangeHandler;
 import com.vaadin.client.ApplicationConnection;
 import com.vaadin.client.Paintable;
 import com.vaadin.client.UIDL;
 import com.vaadin.client.communication.StateChangeEvent;
 import com.vaadin.client.ui.AbstractComponentConnector;
 import com.vaadin.client.ui.VUpload;
-import com.vaadin.shared.EventId;
 import com.vaadin.shared.ui.Connect;
 import com.vaadin.shared.ui.upload.UploadClientRpc;
-import com.vaadin.shared.ui.upload.UploadServerRpc;
 import com.vaadin.shared.ui.upload.UploadState;
 import com.vaadin.ui.Upload;
 
@@ -40,21 +37,6 @@ public class UploadConnector extends AbstractComponentConnector
             @Override
             public void submitUpload() {
                 getWidget().submit();
-            }
-        });
-    }
-
-    @Override
-    protected void init() {
-        super.init();
-
-        getWidget().fu.addChangeHandler(new ChangeHandler() {
-            @Override
-            public void onChange(ChangeEvent event) {
-                if (hasEventListener(EventId.CHANGE)) {
-                    getRpcProxy(UploadServerRpc.class)
-                            .change(getWidget().fu.getFilename());
-                }
             }
         });
     }
