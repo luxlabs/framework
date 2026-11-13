@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: I02, key down navigation on Firefox 65+ (from Vaadin 8 47711930).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -127,9 +128,9 @@ public class VMenuBar extends SimpleFocusablePanel
         addFocusHandler(this);
 
         /*
-         * Firefox auto-repeat works correctly only if we use a key press
-         * handler, other browsers handle it correctly when using a key down
-         * handler
+         * Firefox prior to v65 auto-repeat works correctly only if we use a key
+         * press handler, other browsers handle it correctly when using a key
+         * down handler
          */
         if (useOldGeckoNavigation()) {
             addKeyPressHandler(this);
@@ -155,8 +156,8 @@ public class VMenuBar extends SimpleFocusablePanel
     }
 
     /**
-     * Firefox auto-repeat works correctly only if we use a key press
-     * handler, other browsers handle it correctly when using a key down
+     * Firefox prior to v65 auto-repeat works correctly only if we use a key
+     * press handler, other browsers handle it correctly when using a key down
      * handler.
      * <p>
      * For internal use only. May be removed or replaced in the future.
@@ -169,7 +170,7 @@ public class VMenuBar extends SimpleFocusablePanel
      *         key down handler
      */
     static boolean isOldGeckoNavigation(boolean gecko, float geckoVersion) {
-        return gecko;
+        return gecko && geckoVersion < 65;
     }
 
     public VMenuBar(boolean subMenu, VMenuBar parentMenu) {

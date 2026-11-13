@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: I02, key down navigation on Firefox 65+ (from Vaadin 8 47711930).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -557,9 +558,9 @@ public class VScrollTable extends FlowPanel
 
         @Override
         public void onKeyPress(KeyPressEvent keyPressEvent) {
-            // This is used for Firefox only, since Firefox auto-repeat
-            // works correctly only if we use a key press handler, other
-            // browsers handle it correctly when using a key down handler
+            // This is used for Firefox (prior to v65) only, since Firefox
+            // auto-repeat works correctly only if we use a key press handler,
+            // other browsers handle it correctly when using a key down handler
             if (!VMenuBar.useOldGeckoNavigation()) {
                 return;
             }
@@ -624,7 +625,7 @@ public class VScrollTable extends FlowPanel
         @Override
         public void onKeyDown(KeyDownEvent keyDownEvent) {
             NativeEvent event = keyDownEvent.getNativeEvent();
-            // This is not used for Firefox
+            // This is not used for Firefox prior to v65
             if (VMenuBar.useOldGeckoNavigation()) {
                 return;
             }
@@ -829,9 +830,9 @@ public class VScrollTable extends FlowPanel
         scrollBodyPanel.addScrollHandler(this);
 
         /*
-         * Firefox auto-repeat works correctly only if we use a key press
-         * handler, other browsers handle it correctly when using a key down
-         * handler
+         * Firefox prior to v65 auto-repeat works correctly only if we use a key
+         * press handler, other browsers handle it correctly when using a key
+         * down handler
          */
         if (VMenuBar.useOldGeckoNavigation()) {
             scrollBodyPanel.addKeyPressHandler(navKeyPressHandler);
