@@ -245,7 +245,18 @@ public abstract class BootstrapHandler extends SynchronizedRequestHandler {
     protected boolean canHandleRequest(VaadinRequest request) {
         // We do not want to handle /APP requests here, instead let it fall
         // through and produce a 404
-        return !ServletPortletHelper.isAppRequest(request);
+        if (ServletPortletHelper.isAppRequest(request)) {
+            return false;
+        }
+        // Nor /VAADIN requests: they are static resources, and when they are
+        // not served as such (e.g. the servlet is mapped to a sub path) the
+        // application page must not be served under /VAADIN/ (M15)
+        String pathInfo = request.getPathInfo();
+        if (pathInfo != null && (pathInfo.equals("/VAADIN")
+                || pathInfo.startsWith("/VAADIN/"))) {
+            return false;
+        }
+        return true;
     }
 
     @Override
