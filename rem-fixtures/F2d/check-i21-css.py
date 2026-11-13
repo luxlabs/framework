@@ -33,7 +33,8 @@ def rules(css):
 
 
 def main():
-    found = rules(load(sys.argv[1]))
+    css = load(sys.argv[1])
+    found = rules(css)
     expected = [
         ('.valo .v-table-cell-content', 'height: %dpx;' % BODY),
         ('.valo .v-table-table td', 'box-sizing: border-box;'),
@@ -47,6 +48,11 @@ def main():
         hit = any(decl in b for b in bodies)
         ok = ok and hit
         print('%s %s { %s } observed: %s' % ('OK  ' if hit else 'FAIL', sel, decl, ' | '.join(bodies) or 'missing'))
+    # Guard: a Sass line comment ("//") copied into the CSS would swallow the
+    # next rule in the browser.
+    stray = [l for l in css.splitlines() if l.lstrip().startswith('//')]
+    ok = ok and not stray
+    print('%s no "//" line in the compiled CSS, observed: %d %s' % ('OK  ' if not stray else 'FAIL', len(stray), stray[:2]))
     print('I21 compiled CSS check:', 'PASS' if ok else 'FAIL')
     return 0 if ok else 1
 
