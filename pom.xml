@@ -260,6 +260,22 @@
                             <goal>parse-version</goal>
                         </goals>
                     </execution>
+                    <!-- Unpacked Dependencies as resource: needs extra resource folder for unpacked dependencies -->
+                    <execution>
+                        <id>add-dependency-resources</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>add-resource</goal>
+                        </goals>
+                        <configuration>
+                            <resources>
+                                <resource>
+                                    <directory>${dependency.unpack.directory}</directory>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
             <plugin>
@@ -281,31 +297,6 @@
                             <ignores>
                                 <ignore>com.google.gwt.*</ignore>
                             </ignores>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Unpacked Dependencies as resource -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-
-                <!-- Needs extra resource folder for unpacked dependencies -->
-                <executions>
-                    <execution>
-                        <id>add-dependency-resources</id>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>add-resource</goal>
-                        </goals>
-                        <configuration>
-                            <resources>
-                                <resource>
-                                    <directory>${dependency.unpack.directory}</directory>
-                                    <filtering>false</filtering>
-                                </resource>
-                            </resources>
                         </configuration>
                     </execution>
                 </executions>
