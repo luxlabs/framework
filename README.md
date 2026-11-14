@@ -43,14 +43,21 @@ Item codes refer to the LuxLabs remediation matrix (`M..`, vulnerabilities and s
 | M15, I54 | no bootstrap page is served for paths under `/VAADIN/` |
 | M16, I43 | error responses carry `Cache-Control: no-cache, no-store, must-revalidate` |
 | M17, I58 | the size of the body of UIDL requests and push messages is limited (configurable) |
-| M04, I05 · Panel caption XSS | client side: **to be completed by F2c** |
-| M03 · client part | Grid column hiding toggle in the client: **to be completed by F2c** |
+| M04, I05 · Panel caption XSS | the Panel caption is rendered as text, and as HTML only with `setCaptionAsHtml(true)` |
+| M03 · CVE-2019-25028, client part | the captions of the Grid column hiding toggles are rendered as text in the client too |
 
 Not affected, declared with OpenVEX: CVE-2026-110737 (M07: with Atmosphere `2.2.13.vaadin1` the push endpoint does not send CORS headers) and the libraries bundled in `gwt-dev` (M13: build-time only).
 
 ### Browser compatibility
 
-> **Placeholder for F2c.** The client-side fixes (keyboard navigation with Firefox 65+ in MenuBar, Slider, DateField, Tree and Table, I02; ComboBox autocompletion with Chrome, I03; global variable `u2f` with Firefox 67+, I04; text selection in Table with Chrome, I10; text selection in Grid cells, I46; `ResponsiveConnector` and CSS rules without `selectorText`, I55; and the client parts of M03 and M04) are listed here when F2c is integrated, with what was fixed, what was tested in Chromium and what is still to be tested in Firefox.
+| Item | Change |
+| --- | --- |
+| I02 | keyboard navigation with Firefox 65 and later in MenuBar, Slider, the DateField calendar, Tree and Table (key down events are handled as in Vaadin 8). Fixed and tested on the JVM; the test in Firefox is still to be completed |
+| I03 | ComboBox and DateField inputs get `autocomplete="off"` in Chrome and Chromium (also headless), so Chrome no longer autofills them |
+| I04 | the global variable `u2f` of Firefox 67 and later is reserved for the GWT compiler, which reads the list of Firefox globals from `vaadin-client`. Fixed and tested on the compiler; the test in Firefox is still to be completed |
+| I10 | text in Table cells can be selected with the mouse in Chrome |
+| I46 | the text of a single Grid cell can be selected and copied: the selection survives the redraw of the row |
+| I55 | `ResponsiveConnector` no longer fails on CSS rules without `selectorText` (for example `@layer` and `@container`) |
 
 ### Functional
 
@@ -64,6 +71,9 @@ Not affected, declared with OpenVEX: CVE-2026-110737 (M07: with Atmosphere `2.2.
 | I29 | Window: resize and drag curtains removed when the window is closed |
 | I41 | Upload: no upload is started without a file, and the change listener still works after the first upload |
 | I56 | an expired session answers 403 instead of 410, and the client shows the session expired message |
+| I14 | ComboBox: typing fast and leaving with Tab selects or adds the typed value |
+| I15 | Grid: adding columns while other columns are hidden no longer throws `IndexOutOfBoundsException` |
+| I40, I44 | ComboBox: the open popup is not moved back to its default position at every update; the part of I44 that I40 needs (the menu padding in the position check) is kept, the rest of I44 is not included |
 
 ### Not fixed or removed
 
@@ -73,7 +83,8 @@ Not affected, declared with OpenVEX: CVE-2026-110737 (M07: with Atmosphere `2.2.
 | I34 · concurrent disconnect and push | removed: the fix written for the fork caused regressions with the fork's server; reverted |
 | I24, I28, I31, I47, I51 · Atmosphere updates (2.2.13.vaadin2 to vaadin4, 2.4) | not included: those Atmosphere builds are not among the allowed inputs |
 | I12, I33, I35, I59, I62 · push reconnection and session lock details | no change: not reproduced, no allowed source |
-| F2c exclusions | **to be completed by F2c** |
+| I01 · Grid sorting after toggling multi-selection | removed (reverted): not reproduced on 7.7.17 |
+| I42 · ComboBox popup position while the page scrolls | no change: not reproduced on 7.7.17 |
 
 Other notes of 7.7.18 to 7.7.55 (license, license checker, Multiplatform Runtime, Jakarta, portlets, OSGi, build changes) do not apply to this fork.
 
@@ -84,6 +95,7 @@ Other notes of 7.7.18 to 7.7.55 (license, license checker, Multiplatform Runtime
 | Java at runtime | Java 8 or later: jsoup 1.24.1 is compiled for Java 8, so `vaadin-server` declares `Bundle-RequiredExecutionEnvironment: JavaSE-1.8` |
 | Widgetsets and themes | compile them with `com.vaadin:vaadin-maven-plugin:7.7.17` (Apache License 2.0); no plugin `7.7.17.1` exists. The root POM pins `vaadin.plugin.version` to `7.7.17` in the default build and in the `snapshot` and `release` profiles |
 | Code compiled against 7.7.17 | must be recompiled if it uses jsoup types (see the compatibility notes below) |
+| Custom widgetsets | recompile them with `vaadin-client` and `vaadin-client-compiler` 7.7.17.1: the client fixes listed above, including the reserved globals of I04, reach a widgetset only when it is compiled again |
 
 ## Changed behaviour
 
