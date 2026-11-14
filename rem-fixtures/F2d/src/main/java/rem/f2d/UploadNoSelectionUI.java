@@ -31,13 +31,16 @@ public class UploadNoSelectionUI extends LogUI {
     protected void setup() {
         final Upload upload = new Upload("upload", (filename, mime) -> {
             log("receiving '" + filename + "'");
+            Diag.event("i41 receiving '" + filename + "'");
             return new ByteArrayOutputStream();
         });
         upload.setId("upload");
         upload.setImmediate(false);
         upload.setButtonCaption("Upload");
-        upload.addFinishedListener(e -> log(
-                "finished '" + e.getFilename() + "' " + e.getLength()));
+        upload.addFinishedListener(e -> {
+            log("finished '" + e.getFilename() + "' " + e.getLength());
+            Diag.event("i41 finished '" + e.getFilename() + "' " + e.getLength());
+        });
         Button programmatic = new Button("programmatic",
                 e -> upload.submitUpload());
         programmatic.setId("programmatic");

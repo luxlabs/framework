@@ -499,6 +499,30 @@ function windowCurtain(handleSelector) {
   };
 }
 
+// I56 from end to end: after the session expires, the next heartbeat (every
+// 4 s in this context) gets the session expired status and the client must
+// show the "Session Expired" message, not the reconnect dialog.
+async function sessionExpired(page, d) {
+  const heartbeats = [];
+  page.on('response', (r) => {
+    if (new URL(r.url()).pathname.includes('/HEARTBEAT')) heartbeats.push(r.status());
+  });
+  await gotoUi(page, 'i56');
+  await page.click('#expire');
+  const set = await waitForLog(page, (l) => l.some((s) => /session expires/.test(s)), 5000);
+  let shown = false;
+  try {
+    await page.waitForFunction(() => Array.from(document.querySelectorAll('.v-Notification'))
+      .some((n) => /Session Expired/i.test(n.textContent)), null, { timeout: 20000 });
+    shown = true;
+  } catch (e) {
+    shown = false;
+  }
+  const reconnect = await page.$$eval('.v-reconnect-dialog', (els) => els.filter((e) => e.offsetParent !== null).length);
+  d.push(`expire set=${!!set}`, `heartbeat statuses=${heartbeats.join(',') || '-'}`, `session expired message=${shown}`, `reconnect dialogs=${reconnect}`);
+  return !!set && shown && reconnect === 0;
+}
+
 // I41: ChangeListener after the first upload.
 async function uploadChange(page, d) {
   const f1 = path.join(OUT, 'upload-1.txt');
@@ -560,6 +584,7 @@ async function uploadNoSelection(page, d) {
     await scenario(browser, 'i29-resize', 'I29', 'red on base, green on candidate', null, windowCurtain('#closing-window .v-window-resizebox'));
     await scenario(browser, 'i41-change', 'I41', 'red on base, green on candidate', null, uploadChange);
     await scenario(browser, 'i41-noselect', 'I41', 'red on base, green on candidate', null, uploadNoSelection);
+    await scenario(browser, 'i56-expired', 'I56', 'green on base and candidate', null, sessionExpired);
   } finally {
     await browser.close();
   }

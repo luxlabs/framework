@@ -28,6 +28,8 @@
         <dependency><groupId>org.eclipse.jetty</groupId><artifactId>jetty-servlet</artifactId><version>${jetty.version}</version></dependency>
         <!-- Atmosphere uses the Jetty continuation API when it detects Jetty -->
         <dependency><groupId>org.eclipse.jetty</groupId><artifactId>jetty-continuation</artifactId><version>${jetty.version}</version></dependency>
+        <!-- HTTP tests of criterion 5 against the embedded fixture -->
+        <dependency><groupId>junit</groupId><artifactId>junit</artifactId><version>4.11</version><scope>test</scope></dependency>
     </dependencies>
 
     <build>

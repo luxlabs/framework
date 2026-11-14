@@ -171,6 +171,16 @@ public final class Diag {
         protected void doGet(HttpServletRequest req, HttpServletResponse resp)
                 throws IOException {
             resp.setContentType("text/plain;charset=UTF-8");
+            if ("1".equals(req.getParameter("all"))) {
+                StringBuilder all = new StringBuilder();
+                synchronized (EVENTS) {
+                    for (String e : EVENTS) {
+                        all.append(e).append('\n');
+                    }
+                }
+                resp.getWriter().write(all.toString());
+                return;
+            }
             List<String> list = LINES.get(String.valueOf(req.getParameter("rep")));
             List<String> out = new ArrayList<String>();
             long from = Long.MAX_VALUE;

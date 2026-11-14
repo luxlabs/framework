@@ -32,6 +32,13 @@ public class FixtureServer {
 
     public static void main(String[] args) throws Exception {
         int port = Integer.parseInt(args[0]);
+        Server server = start(port);
+        System.out.println("F2D-FIXTURE-READY " + port);
+        server.join();
+    }
+
+    /** Starts the fixture on 127.0.0.1:port and returns the running server. */
+    public static Server start(int port) throws Exception {
         Server server = new Server();
         ServerConnector connector = new ServerConnector(server);
         connector.setHost("127.0.0.1");
@@ -56,12 +63,19 @@ public class FixtureServer {
         contexts.addHandler(context("/i11-fixed", GridFixedResizeUI.class));
         contexts.addHandler(context("/i29", WindowCurtainUI.class));
         contexts.addHandler(context("/i41-change", UploadChangeUI.class));
-        contexts.addHandler(context("/i41-noselect", UploadNoSelectionUI.class));
+        ServletContextHandler noSelect = context("/i41-noselect",
+                UploadNoSelectionUI.class);
+        noSelect.addServlet(new ServletHolder("diag", new Diag.Servlet()),
+                "/diag");
+        contexts.addHandler(noSelect);
+        ServletContextHandler expiry = context("/i56", SessionExpiryUI.class);
+        expiry.getServletHandler().getServlet("SessionExpiryUI")
+                .setInitParameter("heartbeatInterval", "4");
+        contexts.addHandler(expiry);
         server.setHandler(contexts);
         server.setStopAtShutdown(true);
         server.start();
-        System.out.println("F2D-FIXTURE-READY " + port);
-        server.join();
+        return server;
     }
 
     private static ServletContextHandler context(String path,
