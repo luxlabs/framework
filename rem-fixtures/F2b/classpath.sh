@@ -1,11 +1,16 @@
 #!/bin/bash
 # Prints the runtime classpath of the F2b fixtures.
 # usage: classpath.sh <maven repository with vaadin 7.7.17.1 jars> <jsoup jar>
+# Environment: M2_REPO, a local Maven repository with the third party jars
+# (sass compiler, sac, flute, servlet API, Jetty util/http/io); DEPS_REPO, a
+# Maven repository with jetty-server, jetty-servlet and jetty-security.
 set -euo pipefail
 M2=$1
 JSOUP=$2
-HOME_M2=/path/to/m2-repository
-DF=/path/to/dipendenze-fork
+: "${M2_REPO:?set M2_REPO to a local Maven repository}"
+: "${DEPS_REPO:?set DEPS_REPO to the Maven repository with the Jetty server jars}"
+HOME_M2=$M2_REPO
+DF=$DEPS_REPO
 V=7.7.17.1
 J=9.4.19.v20190610
 cp=""

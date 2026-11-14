@@ -11,5 +11,5 @@ Fixtures of package F2b (server-side fixes of the 7.7.17.1 fork), outside the Ma
 | `src/rem/f2b/fixture/HttpChecks.java` | bootstrap pages, static resources, M14 directories, M15 `/app/VAADIN/...` |
 | `browser/test.js` | Playwright checks; every request outside 127.0.0.1:port is aborted and recorded |
 | `browser/evaluate.py` | expected red on 7.7.17.1, green on the candidate |
-| `classpath.sh` | runtime classpath from a Maven repository |
+| `classpath.sh` | runtime classpath from a Maven repository; needs the environment variables `M2_REPO` (local Maven repository with the third party jars) and `DEPS_REPO` (repository with the Jetty server jars) |
 | `src/rem/f2b/fixture/boot/BootNestedJarCheck.java` | M14 (review R3): `/VAADIN/` files of a Spring Boot 1.5 executable jar (nested jars, `BOOT-INF/classes`) stay allowed, directories are refused; needs the Spring Boot 1.5.22 loader on the classpath, not used by `esegui.sh` |
