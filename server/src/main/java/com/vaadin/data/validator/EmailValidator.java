@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M02/I16 (CVE-2020-36320), pattern from Vaadin 8 754ca011d7.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -34,6 +36,11 @@ package com.vaadin.data.validator;
 @SuppressWarnings("serial")
 public class EmailValidator extends RegexpValidator {
 
+    private static final String PATTERN = "^" + "([a-zA-Z0-9_\\.\\-+])+" // local
+            + "@" + "[a-zA-Z0-9-.]+" // domain
+            + "\\." + "[a-zA-Z0-9-]{2,}" // tld
+            + "$";
+
     /**
      * Creates a validator for checking that a string is a syntactically valid
      * e-mail address.
@@ -42,7 +49,6 @@ public class EmailValidator extends RegexpValidator {
      *            the message to display in case the value does not validate.
      */
     public EmailValidator(String errorMessage) {
-        super("^([a-zA-Z0-9_\\.\\-+])+@(([a-zA-Z0-9-])+\\.)+([a-zA-Z0-9]{2,4})+$",
-                true, errorMessage);
+        super(PATTERN, true, errorMessage);
     }
 }

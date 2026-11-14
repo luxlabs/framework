@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M08-M10/I27 (jsoup 1.24.1: constructors, self-closing design tags), written by LuxLabs.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -23,6 +25,7 @@ import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.Locale;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -33,6 +36,7 @@ import org.jsoup.nodes.DocumentType;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
 import org.jsoup.parser.Parser;
+import org.jsoup.parser.Tag;
 import org.jsoup.select.Elements;
 
 import com.vaadin.annotations.DesignRoot;
@@ -383,9 +387,29 @@ public class Design implements Serializable {
      * @return the parsed jsoup document
      * @throws IOException
      */
+    /**
+     * Lets the tags of the design vocabulary be self-closing: the custom
+     * (unknown to HTML) tags and {@code menu}, an HTML tag that MenuBar
+     * designs use for their items ({@code <menu separator />}).
+     */
+    private static class SelfClosingCustomTags implements Consumer<Tag> {
+        @Override
+        public void accept(Tag tag) {
+            if (!tag.isKnownTag() || "menu".equals(tag.normalName())) {
+                tag.set(Tag.SelfClose);
+            }
+        }
+    }
+
     private static Document parse(InputStream html) {
         try {
-            Document doc = Jsoup.parse(html, UTF8, "", Parser.htmlParser());
+            Parser parser = Parser.htmlParser();
+            // Designs use self-closing custom elements (<vaadin-label />).
+            // jsoup up to 1.8.3 honored the self-closing flag; newer versions
+            // follow HTML5 and would nest the following siblings inside the
+            // element. Let the design tags self-close, as before.
+            parser.tagSet().onNewTag(new SelfClosingCustomTags());
+            Document doc = Jsoup.parse(html, UTF8, "", parser);
             return doc;
         } catch (IOException e) {
             throw new DesignException("The html document cannot be parsed.");
@@ -514,7 +538,7 @@ public class Design implements Serializable {
     private static Document createHtml(DesignContext designContext) {
         // Create the html tree skeleton.
         Document doc = new Document("");
-        DocumentType docType = new DocumentType("html", "", "", "");
+        DocumentType docType = new DocumentType("html", "", "");
         doc.appendChild(docType);
         Element html = doc.createElement("html");
         doc.appendChild(html);

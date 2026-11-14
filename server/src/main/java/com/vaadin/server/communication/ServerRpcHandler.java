@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M17/I58 (configurable maximum request body size), written by LuxLabs.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -38,6 +40,7 @@ import com.vaadin.server.ServerRpcManager.RpcInvocationException;
 import com.vaadin.server.ServerRpcMethodInvocation;
 import com.vaadin.server.VaadinRequest;
 import com.vaadin.server.VaadinService;
+import com.vaadin.server.VaadinSession;
 import com.vaadin.server.VariableOwner;
 import com.vaadin.shared.ApplicationConstants;
 import com.vaadin.shared.Connector;
@@ -203,6 +206,32 @@ public class ServerRpcHandler implements Serializable {
     private static final int MAX_BUFFER_SIZE = 64 * 1024;
 
     /**
+     * Name of the deployment configuration parameter with the maximum size,
+     * in characters, of the body of a UIDL request or of a push message. It
+     * is read with
+     * {@link com.vaadin.server.DeploymentConfiguration#getApplicationOrSystemProperty(String, String)}:
+     * a servlet init parameter <code>maxRequestBodySize</code>, or a system
+     * property <code>vaadin.maxRequestBodySize</code> (the package of the
+     * servlet class plus the name). A body over the limit is not read further
+     * and the request fails with an {@link IOException}. <code>-1</code>
+     * disables the limit. Defaults to {@link #DEFAULT_MAX_REQUEST_BODY_SIZE}.
+     * Uploads are not affected (they are not handled by this class).
+     *
+     * @since 7.7.17.1
+     */
+    public static final String MAX_REQUEST_BODY_SIZE_PARAMETER = "maxRequestBodySize";
+
+    /**
+     * Default maximum size, in characters, of the body of a UIDL request or
+     * push message: 32 MiB. Large enough for any message produced by the
+     * client in normal use (field values, rich text with embedded images),
+     * small enough to bound the memory a single request can take.
+     *
+     * @since 7.7.17.1
+     */
+    public static final long DEFAULT_MAX_REQUEST_BODY_SIZE = 32L * 1024 * 1024;
+
+    /**
      * Reads JSON containing zero or more serialized RPC calls (including legacy
      * variable changes) and executes the calls.
      *
@@ -221,7 +250,11 @@ public class ServerRpcHandler implements Serializable {
             throws IOException, InvalidUIDLSecurityKeyException {
         ui.getSession().setLastRequestTimestamp(System.currentTimeMillis());
 
-        String changeMessage = getMessage(reader);
+        // The protected hook getMessage(Reader) is called as in 7.7.17; the
+        // size limit (M17) applies to the reader that it receives
+        long maxSize = getMaxRequestBodySize(ui);
+        String changeMessage = getMessage(
+                maxSize < 0 ? reader : new SizeLimitedReader(reader, maxSize));
 
         if (changeMessage == null || changeMessage.equals("")) {
             // The client sometimes sends empty messages, this is probably a bug
@@ -630,6 +663,91 @@ public class ServerRpcHandler implements Serializable {
         }
 
         return sb.toString();
+    }
+
+    /**
+     * Reader that fails as soon as more than a maximum number of characters
+     * is read from it, without reading further (M17).
+     */
+    private static class SizeLimitedReader extends Reader {
+        private final Reader in;
+        private final long maxSize;
+        private long count;
+
+        SizeLimitedReader(Reader in, long maxSize) {
+            this.in = in;
+            this.maxSize = maxSize;
+        }
+
+        @Override
+        public int read(char[] cbuf, int off, int len) throws IOException {
+            if (len == 0) {
+                return 0;
+            }
+            if (count > maxSize) {
+                throw exceeded();
+            }
+            // Read at most one character beyond the limit, to detect it.
+            // 0 <= count <= maxSize here, so the subtraction cannot overflow;
+            // remaining + 1 is computed only when remaining < len, that is
+            // when it fits in an int (review R4: maxSize = Long.MAX_VALUE).
+            long remaining = maxSize - count;
+            int toRead = remaining >= len ? len : (int) remaining + 1;
+            int n = in.read(cbuf, off, toRead);
+            if (n > 0) {
+                count += n;
+                if (count > maxSize) {
+                    throw exceeded();
+                }
+            }
+            return n;
+        }
+
+        private IOException exceeded() {
+            return new IOException(
+                    "The request body exceeds the maximum size of " + maxSize
+                            + " characters (parameter "
+                            + MAX_REQUEST_BODY_SIZE_PARAMETER + ")");
+        }
+
+        @Override
+        public void close() throws IOException {
+            in.close();
+        }
+    }
+
+    /**
+     * Gets the maximum size of a request body for the given UI.
+     *
+     * @see #MAX_REQUEST_BODY_SIZE_PARAMETER
+     * @param ui
+     *            the UI the request is for
+     * @return the maximum number of characters, or -1 for no limit
+     * @since 7.7.17.1
+     */
+    protected long getMaxRequestBodySize(UI ui) {
+        VaadinSession session = ui.getSession();
+        if (session == null || session.getService() == null
+                || session.getService().getDeploymentConfiguration() == null) {
+            return DEFAULT_MAX_REQUEST_BODY_SIZE;
+        }
+        String value = session.getService().getDeploymentConfiguration()
+                .getApplicationOrSystemProperty(
+                        MAX_REQUEST_BODY_SIZE_PARAMETER,
+                        String.valueOf(DEFAULT_MAX_REQUEST_BODY_SIZE));
+        if (value == null) {
+            return DEFAULT_MAX_REQUEST_BODY_SIZE;
+        }
+        try {
+            long size = Long.parseLong(value.trim());
+            return size < 0 ? -1 : size;
+        } catch (NumberFormatException e) {
+            getLogger().log(Level.WARNING,
+                    "Invalid value {0} for {1}, using the default {2}",
+                    new Object[] { value, MAX_REQUEST_BODY_SIZE_PARAMETER,
+                            DEFAULT_MAX_REQUEST_BODY_SIZE });
+            return DEFAULT_MAX_REQUEST_BODY_SIZE;
+        }
     }
 
     private static final Logger getLogger() {

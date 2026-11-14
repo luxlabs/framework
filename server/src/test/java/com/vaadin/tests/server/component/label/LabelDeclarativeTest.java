@@ -1,3 +1,6 @@
+/*
+ * Modified by LuxLabs in 2026: I27 (adapted to jsoup 1.24.1).
+ */
 package com.vaadin.tests.server.component.label;
 
 import org.jsoup.nodes.Element;
@@ -40,7 +43,7 @@ public class LabelDeclarativeTest extends DeclarativeTestBase<Label> {
     @Test
     public void testRich() {
         String design = "<vaadin-label>This is <b><u>Rich</u></b> content!</vaadin-label>";
-        Label l = createLabel("This is \n<b><u>Rich</u></b> content!", null,
+        Label l = createLabel("This is <b><u>Rich</u></b> content!", null,
                 true);
         testRead(design, l);
         testWrite(design, l);
@@ -61,7 +64,7 @@ public class LabelDeclarativeTest extends DeclarativeTestBase<Label> {
     public void testContentAndCaption() {
         String design = "<vaadin-label caption='This is a label'>This is <b><u>Rich</u></b> "
                 + "content!</vaadin-label>";
-        Label l = createLabel("This is \n<b><u>Rich</u></b> content!",
+        Label l = createLabel("This is <b><u>Rich</u></b> content!",
                 "This is a label", true);
         testRead(design, l);
         testWrite(design, l);

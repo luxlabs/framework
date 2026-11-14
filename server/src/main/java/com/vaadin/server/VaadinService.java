@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M01/I18 (CVE-2021-31403, from Vaadin 8 7cb91b3b99); M16/I43 (no-store headers, from Vaadin 8 a30f74592a); I23 (session lock, from Vaadin 8 d5067d6bbd); I56 (403 for expired session, from Vaadin 8 477e9fe824).
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -28,6 +30,8 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -610,6 +614,29 @@ public abstract class VaadinService implements Serializable {
      *             if the session is invalidated before it can be locked
      */
     protected void lockSession(WrappedSession wrappedSession) {
+        LOCKED_BY_LOCK_SESSION.set(lockSessionAndGetLock(wrappedSession));
+    }
+
+    /**
+     * The lock instance acquired by the default {@link #lockSession} in this
+     * thread, read and cleared by findOrCreateVaadinSession, which needs it
+     * to release the lock if the session is invalidated meanwhile (I23).
+     */
+    private static final ThreadLocal<Lock> LOCKED_BY_LOCK_SESSION = new ThreadLocal<Lock>();
+
+    /**
+     * Locks the given session and returns the lock instance that was locked,
+     * so that it can be released even if the session is invalidated in the
+     * meantime and {@link #getSessionLock(WrappedSession)} can no longer read
+     * it (I23, see Vaadin 8.14 where lockSession returns the lock).
+     *
+     * @param wrappedSession
+     *            The session to lock
+     * @return the locked lock instance
+     * @throws IllegalStateException
+     *             if the session is invalidated before it can be locked
+     */
+    private Lock lockSessionAndGetLock(WrappedSession wrappedSession) {
         Lock lock = getSessionLock(wrappedSession);
         if (lock == null) {
             /*
@@ -639,6 +666,7 @@ public abstract class VaadinService implements Serializable {
             lock.unlock();
             throw e;
         }
+        return lock;
     }
 
     /**
@@ -662,17 +690,59 @@ public abstract class VaadinService implements Serializable {
         WrappedSession wrappedSession = getWrappedSession(request,
                 requestCanCreateSession);
 
+        // The protected hooks lockSession and unlockSession are called as in
+        // 7.7.17, so that subclasses that override them keep working
+        Lock lock;
+        LOCKED_BY_LOCK_SESSION.remove();
         try {
             lockSession(wrappedSession);
+            lock = LOCKED_BY_LOCK_SESSION.get();
         } catch (IllegalStateException e) {
             throw new SessionExpiredException();
+        } finally {
+            LOCKED_BY_LOCK_SESSION.remove();
         }
+        if (lock == null) {
+            // an override that does not call super: find the lock instance
+            try {
+                lock = getSessionLock(wrappedSession);
+            } catch (IllegalStateException e) {
+                lock = null;
+            }
+        }
+        int holdCount = lock instanceof ReentrantLock
+                ? ((ReentrantLock) lock).getHoldCount() : -1;
 
         try {
             return doFindOrCreateVaadinSession(request,
                     requestCanCreateSession);
         } finally {
-            unlockSession(wrappedSession);
+            try {
+                unlockSession(wrappedSession);
+            } catch (IllegalStateException e) {
+                if (!isInvalidated(wrappedSession)) {
+                    // the session is still valid: an error of the hook
+                    // itself, propagated as in 7.7.17 (review R2)
+                    throw e;
+                }
+                // Another thread has invalidated the session meanwhile:
+                // unlockSession cannot read the lock from it. Release the
+                // instance that this thread locked, unless it was already
+                // released, otherwise it stays locked forever (I23)
+                if (lock instanceof ReentrantLock) {
+                    ReentrantLock reentrant = (ReentrantLock) lock;
+                    if (reentrant.isHeldByCurrentThread()
+                            && reentrant.getHoldCount() == holdCount) {
+                        reentrant.unlock();
+                    }
+                } else if (lock != null) {
+                    try {
+                        lock.unlock();
+                    } catch (IllegalMonitorStateException alreadyReleased) {
+                        // released by the hook before it failed
+                    }
+                }
+            }
         }
 
     }
@@ -688,6 +758,19 @@ public abstract class VaadinService implements Serializable {
      * @throws SessionExpiredException
      * @throws ServiceException
      */
+    /**
+     * Checks whether a session has been invalidated: reading an attribute of
+     * an invalidated session throws IllegalStateException.
+     */
+    private boolean isInvalidated(WrappedSession wrappedSession) {
+        try {
+            wrappedSession.getAttribute(getLockAttributeName());
+            return false;
+        } catch (IllegalStateException e) {
+            return true;
+        }
+    }
+
     private VaadinSession doFindOrCreateVaadinSession(VaadinRequest request,
             boolean requestCanCreateSession)
             throws SessionExpiredException, ServiceException {
@@ -1469,7 +1552,7 @@ public abstract class VaadinService implements Serializable {
                 SystemMessages ci = getSystemMessages(ServletPortletHelper
                         .findLocale(null, vaadinSession, request), request);
                 try {
-                    writeStringResponse(response,
+                    writeUncachedStringResponse(response,
                             JsonConstants.JSON_CONTENT_TYPE,
                             createCriticalNotificationJSON(
                                     ci.getInternalErrorCaption(),
@@ -1519,6 +1602,52 @@ public abstract class VaadinService implements Serializable {
     }
 
     /**
+     * Sets all conceivable headers that might prevent a response from being
+     * stored in any caches.
+     * <p>
+     * In Vaadin 8 this is a default method of {@link VaadinResponse}; Vaadin 7
+     * targets Java 6, which has no default methods, so it is a static helper
+     * here.
+     *
+     * @param response
+     *            the response to set the headers on
+     * @since 7.7.17.1
+     */
+    public static void setNoCacheHeaders(VaadinResponse response) {
+        // no-store to disallow storing even if cache would be revalidated
+        // must-revalidate to not use stored value even if someone asks for it
+        response.setHeader("Cache-Control",
+                "no-cache, no-store, must-revalidate");
+
+        // Also set legacy values in case of old proxies in between
+        response.setHeader("Pragma", "no-cache");
+        response.setHeader("Expires", "0");
+    }
+
+    /**
+     * Writes the given string as a response with headers to prevent caching and
+     * using the given content type.
+     *
+     * @param response
+     *            The response reference
+     * @param contentType
+     *            The content type of the response
+     * @param responseString
+     *            The actual response
+     * @throws IOException
+     *             If an error occurred while writing the response
+     * @since 7.7.17.1
+     */
+    public void writeUncachedStringResponse(VaadinResponse response,
+            String contentType, String responseString) throws IOException {
+        // Response might contain sensitive information, so prevent all forms of
+        // caching
+        setNoCacheHeaders(response);
+
+        writeStringResponse(response, contentType, responseString);
+    }
+
+    /**
      * Called when the session has expired and the request handling is therefore
      * aborted.
      *
@@ -1565,7 +1694,16 @@ public abstract class VaadinService implements Serializable {
                  * endless loop. This can at least happen if refreshing a
                  * resource when the session has expired.
                  */
-                response.sendError(HttpServletResponse.SC_GONE,
+
+                // Ensure that the browser does not cache expired responses.
+                // iOS 6 Safari requires this (#3226)
+                response.setHeader("Cache-Control", "no-cache");
+                // If Content-Type is not set, browsers assume text/html and may
+                // complain about the empty response body (#4167)
+                response.setHeader("Content-Type", "text/plain");
+
+                // 403 instead of 410 (I56)
+                response.sendError(HttpServletResponse.SC_FORBIDDEN,
                         "Session expired");
             }
         } catch (IOException e) {
@@ -1636,7 +1774,7 @@ public abstract class VaadinService implements Serializable {
     public void criticalNotification(VaadinRequest request,
             VaadinResponse response, String caption, String message,
             String details, String url) throws IOException {
-        writeStringResponse(response, JsonConstants.JSON_CONTENT_TYPE,
+        writeUncachedStringResponse(response, JsonConstants.JSON_CONTENT_TYPE,
                 createCriticalNotificationJSON(caption, message, details, url));
     }
 
@@ -1757,7 +1895,11 @@ public abstract class VaadinService implements Serializable {
                 .isXsrfProtectionEnabled()) {
             String sessionToken = session.getCsrfToken();
 
-            if (sessionToken == null || !sessionToken.equals(requestToken)) {
+            // time-constant comparison (CVE-2021-31403)
+            if (sessionToken == null || requestToken == null
+                    || !MessageDigest.isEqual(
+                            sessionToken.getBytes(Charset.forName("UTF-8")),
+                            requestToken.getBytes(Charset.forName("UTF-8")))) {
                 return false;
             }
         }

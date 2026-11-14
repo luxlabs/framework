@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M05/I52 (CVE-2025-15022), escaped action captions; written by LuxLabs.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -813,7 +815,7 @@ public class Tree extends AbstractSelect implements Container.Hierarchical,
                 target.startTag("action");
                 if (a.getCaption() != null) {
                     target.addAttribute(TreeConstants.ATTRIBUTE_ACTION_CAPTION,
-                            a.getCaption());
+                            a.getCaptionAsClientHtml());
                 }
                 if (a.getIcon() != null) {
                     target.addAttribute(TreeConstants.ATTRIBUTE_ACTION_ICON,

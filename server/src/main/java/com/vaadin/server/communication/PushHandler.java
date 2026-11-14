@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M01/I18 (CVE-2021-31403, from Vaadin 8 885c2298fd); I19 (thread locals after connection lost), written by LuxLabs.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -18,7 +20,10 @@ package com.vaadin.server.communication;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
 import java.util.Collection;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -43,6 +48,7 @@ import com.vaadin.server.VaadinSession;
 import com.vaadin.shared.ApplicationConstants;
 import com.vaadin.shared.communication.PushMode;
 import com.vaadin.ui.UI;
+import com.vaadin.util.CurrentInstance;
 
 import elemental.json.JsonException;
 
@@ -310,6 +316,20 @@ public class PushHandler {
     }
 
     void connectionLost(AtmosphereResourceEvent event) {
+        // The lookups below set the current session and UI in the thread
+        // locals of the calling (Atmosphere) thread: restore what the thread
+        // had before, so that they do not leak (I19)
+        Map<Class<?>, CurrentInstance> oldInstances = CurrentInstance
+                .getInstances(false);
+        try {
+            handleConnectionLost(event);
+        } finally {
+            CurrentInstance.clearAll();
+            CurrentInstance.restoreInstances(oldInstances);
+        }
+    }
+
+    private void handleConnectionLost(AtmosphereResourceEvent event) {
         // We don't want to use callWithUi here, as it assumes there's a client
         // request active and does requestStart and requestEnd among other
         // things.
@@ -473,7 +493,9 @@ public class PushHandler {
     }
 
     /**
-     * Checks whether a given push id matches the session's push id.
+     * Checks whether a given push id matches the session's push id. The
+     * comparison is done using a time-constant method since the push id is used
+     * to protect against cross-site attacks.
      *
      * @param session
      *            the vaadin session for which the check should be done
@@ -485,7 +507,10 @@ public class PushHandler {
             String requestPushId) {
 
         String sessionPushId = session.getPushId();
-        if (requestPushId == null || !requestPushId.equals(sessionPushId)) {
+        if (requestPushId == null || sessionPushId == null
+                || !MessageDigest.isEqual(
+                        requestPushId.getBytes(Charset.forName("UTF-8")),
+                        sessionPushId.getBytes(Charset.forName("UTF-8")))) {
             return false;
         }
         return true;

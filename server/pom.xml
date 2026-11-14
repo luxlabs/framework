@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Modified by LuxLabs in 2026: jsoup 1.24.1 (M08, M09, M10, I27), JavaSE-1.8 (I57). -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
@@ -160,6 +161,23 @@
     <build>
         <plugins>
             <plugin>
+                <!-- jsoup 1.24.1 (I27) takes a java.util.function.Consumer to
+                    customize tags; vaadin-server requires Java 8 at runtime
+                    with it (I57). jsoup itself is excluded in the root POM. -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>animal-sniffer-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>java6compatibility</id>
+                        <configuration>
+                            <ignores combine.children="append">
+                                <ignore>java.util.function.Consumer</ignore>
+                            </ignores>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <artifactId>maven-resources-plugin</artifactId>
                 <executions>
                     <!-- Copy .java files to package -->
@@ -229,7 +247,8 @@
                 <extensions>true</extensions>
                 <configuration>
                     <instructions>
-                        <Bundle-RequiredExecutionEnvironment>JavaSE-1.6</Bundle-RequiredExecutionEnvironment>
+                        <!-- jsoup 1.24.1 requires Java 8 at runtime (I57) -->
+                        <Bundle-RequiredExecutionEnvironment>JavaSE-1.8</Bundle-RequiredExecutionEnvironment>
                         <Bundle-Version>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}</Bundle-Version>
                         <Export-Package>VAADIN;version=${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion},com.vaadin.*;version="${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}"</Export-Package>
                         <Import-Package>javax.servlet;version="2.4",

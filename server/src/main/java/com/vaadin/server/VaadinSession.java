@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M01/I18 (CVE-2021-31403, comment from Vaadin 8 885c2298fd).
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -747,6 +749,10 @@ public class VaadinSession implements HttpSessionBindingListener, Serializable {
 
     private final String csrfToken = UUID.randomUUID().toString();
 
+    /*
+     * This token should be handled with care since it's used to protect against
+     * cross-site attacks in addition to general identifier duty.
+     */
     private final String pushId = UUID.randomUUID().toString();
 
     /**

@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M15/I54 (no bootstrap page for /VAADIN paths), written by LuxLabs; M08-M10/I27 (jsoup 1.24.1 constructors).
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -245,7 +247,18 @@ public abstract class BootstrapHandler extends SynchronizedRequestHandler {
     protected boolean canHandleRequest(VaadinRequest request) {
         // We do not want to handle /APP requests here, instead let it fall
         // through and produce a 404
-        return !ServletPortletHelper.isAppRequest(request);
+        if (ServletPortletHelper.isAppRequest(request)) {
+            return false;
+        }
+        // Nor /VAADIN requests: they are static resources, and when they are
+        // not served as such (e.g. the servlet is mapped to a sub path) the
+        // application page must not be served under /VAADIN/ (M15)
+        String pathInfo = request.getPathInfo();
+        if (pathInfo != null && (pathInfo.equals("/VAADIN")
+                || pathInfo.startsWith("/VAADIN/"))) {
+            return false;
+        }
+        return true;
     }
 
     @Override
@@ -368,8 +381,7 @@ public abstract class BootstrapHandler extends SynchronizedRequestHandler {
 
         Document document = response.getDocument();
 
-        DocumentType doctype = new DocumentType("html", "", "",
-                document.baseUri());
+        DocumentType doctype = new DocumentType("html", "", "");
         document.child(0).before(doctype);
 
         Element head = document.head();
@@ -574,8 +586,7 @@ public abstract class BootstrapHandler extends SynchronizedRequestHandler {
         appendMainScriptTagContents(context, builder);
 
         builder.append("//]]>");
-        mainScriptTag.appendChild(
-                new DataNode(builder.toString(), mainScriptTag.baseUri()));
+        mainScriptTag.appendChild(new DataNode(builder.toString()));
         fragmentNodes.add(mainScriptTag);
 
     }

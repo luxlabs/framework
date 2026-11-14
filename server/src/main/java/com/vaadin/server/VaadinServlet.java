@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M14/I30 (no directories as static files, from Vaadin 8 f70bc4269c, rewritten for Java 6); M16/I43 (no-store headers, from Vaadin 8 a30f74592a).
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -27,6 +29,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Serializable;
 import java.lang.reflect.Method;
+import java.net.JarURLConnection;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -42,6 +45,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -516,7 +521,7 @@ public class VaadinServlet extends HttpServlet implements Constants {
                 SystemMessages systemMessages = getService().getSystemMessages(
                         ServletPortletHelper.findLocale(null, null, request),
                         request);
-                getService().writeStringResponse(response,
+                getService().writeUncachedStringResponse(response,
                         JsonConstants.JSON_CONTENT_TYPE,
                         VaadinService.createCriticalNotificationJSON(
                                 systemMessages.getCookiesDisabledCaption(),
@@ -563,7 +568,7 @@ public class VaadinServlet extends HttpServlet implements Constants {
         if (ServletPortletHelper.isUIDLRequest(request)) {
             String output = VaadinService.createCriticalNotificationJSON(
                     caption, message, details, url);
-            getService().writeStringResponse(response,
+            getService().writeUncachedStringResponse(response,
                     JsonConstants.JSON_CONTENT_TYPE, output);
         } else {
             // Create an HTML reponse with the error
@@ -587,7 +592,7 @@ public class VaadinServlet extends HttpServlet implements Constants {
             if (url != null) {
                 output += "</a>";
             }
-            getService().writeStringResponse(response,
+            getService().writeUncachedStringResponse(response,
                     ApplicationConstants.CONTENT_TYPE_TEXT_HTML_UTF_8, output);
         }
     }
@@ -783,10 +788,12 @@ public class VaadinServlet extends HttpServlet implements Constants {
         }
 
         // security check: do not permit navigation out of the VAADIN
-        // directory
+        // directory or into any directory rather than a file
         if (!isAllowedVAADINResourceUrl(request, resourceUrl)) {
             getLogger().log(Level.INFO,
-                    "Requested resource [{0}] not accessible in the VAADIN directory or access to it is forbidden.",
+                    "Requested resource [{0}] is a directory, "
+                            + "is not within the VAADIN directory, "
+                            + "or access to it is forbidden.",
                     filename);
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             return;
@@ -1032,7 +1039,9 @@ public class VaadinServlet extends HttpServlet implements Constants {
         // directory
         if (!isAllowedVAADINResourceUrl(request, scssUrl)) {
             getLogger().log(Level.INFO,
-                    "Requested resource [{0}] not accessible in the VAADIN directory or access to it is forbidden.",
+                    "Requested resource [{0}] is a directory, "
+                            + "is not within the VAADIN directory, "
+                            + "or access to it is forbidden.",
                     filename);
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 
@@ -1141,7 +1150,9 @@ public class VaadinServlet extends HttpServlet implements Constants {
 
     /**
      * Check whether a URL obtained from a classloader refers to a valid static
-     * resource in the directory VAADIN.
+     * resource in the directory VAADIN. Only resources verified to be regular
+     * files count as valid: directories, and resources whose nature cannot be
+     * determined (protocols other than file: and jar:), are not allowed.
      *
      * Warning: Overriding of this method is not recommended, but is possible to
      * support non-default classloaders or servers that may produce URLs
@@ -1161,6 +1172,9 @@ public class VaadinServlet extends HttpServlet implements Constants {
     @Deprecated
     protected boolean isAllowedVAADINResourceUrl(HttpServletRequest request,
             URL resourceUrl) {
+        if (resourceUrl == null || !resourceIsVerifiedFile(resourceUrl)) {
+            return false;
+        }
         String resourcePath = resourceUrl.getPath();
         if ("jar".equals(resourceUrl.getProtocol())) {
             // This branch is used for accessing resources directly from the
@@ -1199,6 +1213,65 @@ public class VaadinServlet extends HttpServlet implements Constants {
                     resourceUrl);
             return true;
         }
+    }
+
+    /**
+     * Checks that a resource URL denotes a regular file, failing closed: only
+     * a URL that is verified to be a file is accepted. file: URLs must be an
+     * existing regular file; jar: URLs must open as a {@link JarURLConnection}
+     * (the JDK handler, or a handler that extends it, as the Spring Boot
+     * loader does) on an existing entry that is not a directory. A path
+     * ending with a slash, any other protocol (for example vfs: or a custom
+     * class loader protocol) and any URL whose nature cannot be determined
+     * are refused (M14, review R3).
+     */
+    private boolean resourceIsVerifiedFile(URL resource) {
+        if (resource.getPath().endsWith("/")) {
+            return false;
+        }
+        String protocol = resource.getProtocol();
+        if ("jar".equals(protocol)) {
+            try {
+                URLConnection connection = resource.openConnection();
+                if (!(connection instanceof JarURLConnection)) {
+                    return false;
+                }
+                JarURLConnection jarConnection = (JarURLConnection) connection;
+                String entryName = jarConnection.getEntryName();
+                if (entryName == null || entryName.endsWith("/")) {
+                    return false;
+                }
+                // shared, cached JarFile: not to be closed here
+                JarFile jarFile = jarConnection.getJarFile();
+                // getJarEntry also finds an explicit "entryName/" entry,
+                // which is a directory
+                JarEntry entry = jarFile.getJarEntry(entryName);
+                return entry != null && !entry.isDirectory();
+            } catch (IOException e) {
+                getLogger().log(Level.FINE,
+                        "failed to read jar file contents", e);
+                return false;
+            } catch (RuntimeException e) {
+                getLogger().log(Level.FINE, "cannot classify jar resource",
+                        e);
+                return false;
+            }
+        }
+        if ("file".equals(protocol)) {
+            File file;
+            try {
+                file = new File(resource.toURI());
+            } catch (URISyntaxException e) {
+                // not a valid URI, e.g. a path with unencoded spaces: the
+                // path of such a URL is the file system path itself
+                file = new File(resource.getPath());
+            } catch (IllegalArgumentException e) {
+                getLogger().log(Level.FINE, "Not a file uri", e);
+                return false;
+            }
+            return file.isFile();
+        }
+        return false;
     }
 
     /**

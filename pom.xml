@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Modified by LuxLabs in 2026: jsoup 1.24.1 and animal-sniffer exclusion of jsoup (M08, M09, M10, I27); vaadin-maven-plugin 7.7.17 in every profile (F2a review R2). -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
@@ -25,12 +26,12 @@
         <!-- Used version numbers for dependencies -->
         <commons-io.version>2.4</commons-io.version>
         <google.appengine.version>1.7.7</google.appengine.version>
-        <jsoup.version>1.8.3</jsoup.version>
+        <jsoup.version>1.24.1</jsoup.version>
         <liferay.portal.version>6.0.2</liferay.portal.version>
 
         <vaadin.sass.version>0.9.13</vaadin.sass.version>
         <vaadin.gwt.version>2.7.0.vaadin7</vaadin.gwt.version>
-        <vaadin.plugin.version>7.7.0</vaadin.plugin.version>
+        <vaadin.plugin.version>7.7.17</vaadin.plugin.version>
 
         <javax.portlet.version>2.0</javax.portlet.version>
         <javax.servlet.version>3.0.1</javax.servlet.version>
@@ -294,8 +295,16 @@
                                 <artifactId>java16</artifactId>
                                 <version>1.0</version>
                             </signature>
+                            <!-- jsoup 1.24.1 (I27) is a multi-release jar with
+                                Java 11 classes that animal-sniffer 1.15 cannot
+                                read: it is not scanned and its classes are
+                                ignored; the JDK API check stays at Java 6 -->
+                            <excludeDependencies>
+                                <excludeDependency>org.jsoup:jsoup</excludeDependency>
+                            </excludeDependencies>
                             <ignores>
                                 <ignore>com.google.gwt.*</ignore>
+                                <ignore>org.jsoup.*</ignore>
                             </ignores>
                         </configuration>
                     </execution>
@@ -316,7 +325,7 @@
                 needed by them -->
             <id>snapshot</id>
             <properties>
-                <vaadin.plugin.version>${project.version}</vaadin.plugin.version>
+                <vaadin.plugin.version>7.7.17</vaadin.plugin.version>
             </properties>
 
             <build>
@@ -363,7 +372,7 @@
                 <activeByDefault>false</activeByDefault>
             </activation>
             <properties>
-                <vaadin.plugin.version>${project.version}</vaadin.plugin.version>
+                <vaadin.plugin.version>7.7.17</vaadin.plugin.version>
             </properties>
             <build>
                 <plugins>

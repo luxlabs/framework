@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M01/I18 (CVE-2021-31403, from Vaadin 8 885c2298fd); M06/I48 (CVE-2025-9467, interruption before any byte), written by LuxLabs.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -23,6 +25,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
 
 import com.vaadin.server.ClientConnector;
 import com.vaadin.server.NoInputStreamException;
@@ -273,7 +277,11 @@ public class FileUploadHandler implements RequestHandler {
             streamVariable = uI.getConnectorTracker()
                     .getStreamVariable(connectorId, variableName);
             String secKey = uI.getConnectorTracker().getSeckey(streamVariable);
-            if (secKey == null || !secKey.equals(parts[3])) {
+            String securityKey = parts[3];
+            // time-constant comparison (CVE-2021-31403)
+            if (secKey == null || !MessageDigest.isEqual(
+                    secKey.getBytes(Charset.forName("UTF-8")),
+                    securityKey.getBytes(Charset.forName("UTF-8")))) {
                 // TODO Should rethink error handling
                 return true;
             }
@@ -545,14 +553,26 @@ public class FileUploadHandler implements RequestHandler {
         StreamingStartEventImpl startedEvent = new StreamingStartEventImpl(
                 filename, type, contentLength);
         try {
-            boolean listenProgress;
+            boolean listenProgress = false;
+            boolean interruptedAtStart;
             session.lock();
             try {
                 streamVariable.streamingStarted(startedEvent);
-                out = streamVariable.getOutputStream();
-                listenProgress = streamVariable.listenProgress();
+                // an interruption requested while handling the start (e.g.
+                // by a StartedListener that validates the metadata) stops
+                // the upload before the receiver creates any output
+                // (CVE-2025-9467)
+                interruptedAtStart = streamVariable.isInterrupted();
+                if (!interruptedAtStart) {
+                    out = streamVariable.getOutputStream();
+                    listenProgress = streamVariable.listenProgress();
+                }
             } finally {
                 session.unlock();
+            }
+
+            if (interruptedAtStart) {
+                throw new UploadInterruptedException();
             }
 
             // Gets the output target stream
@@ -571,6 +591,10 @@ public class FileUploadHandler implements RequestHandler {
             do {
                 bytesReadToBuffer = in.read(buffer);
                 if (bytesReadToBuffer > 0) {
+                    if (streamVariable.isInterrupted()) {
+                        // no byte reaches the receiver after an interruption
+                        throw new UploadInterruptedException();
+                    }
                     out.write(buffer, 0, bytesReadToBuffer);
                     totalBytes += bytesReadToBuffer;
                 }

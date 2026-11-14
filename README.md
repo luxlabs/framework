@@ -8,6 +8,19 @@ To contribute, first refer to [Contributing Code](https://vaadin.com/wiki/-/wiki
 
 Instructions on how to set up a working environments for developing the Vaadin Framework follow below.
 
+## LuxLabs fork 7.7.17.1
+
+This branch is a fork of Vaadin Framework 7.7.17 with security fixes. Notes on compatibility:
+
+| Item | Note |
+| --- | --- |
+| jsoup | `vaadin-server` depends on jsoup 1.24.1 instead of 1.8.3. Code compiled against jsoup 1.8.3 that calls `org.jsoup.nodes.Attributes.put` or the removed `DocumentType` and `DataNode` constructors must be recompiled. |
+| Java | With jsoup 1.24.1 `vaadin-server` requires Java 8 at runtime: its manifest declares `Bundle-RequiredExecutionEnvironment: JavaSE-1.8`. The Vaadin code itself still uses only the Java 6 API, apart from `java.util.function.Consumer` passed to jsoup. |
+| OSGi | `Bundle-Version` and the versions in `Export-Package` stay `7.7.17`: the build reads only the first three numbers of `7.7.17.1`. `Implementation-Version` is `7.7.17.1`. |
+| Upload size limit | `Upload#setMaxFileSize(long)` limits the bytes actually received, also without `Content-Length` (chunked requests). If the declared length already exceeds the limit, or a `StartedListener` calls `interruptUpload()`, the `Receiver` is not asked for an output stream, so no output is created. Without a declared length the limit is detected only when it is reached: at most the bytes under the limit reach the receiver's output stream, which is then closed, and a `FailedEvent` with `Upload.FileSizeLimitExceededException` is fired. The application's `FailedListener` must discard that partial content (for example delete the file the receiver created). |
+| Action captions | Captions of `Action`s (Table and Tree context menus, Calendar actions, shortcut actions) are sent to the client escaped; `Action#setCaptionAsHtml(true)` sends trusted HTML unchanged. |
+| Declarative | Designs are parsed with jsoup 1.24.1; custom tags and `menu` may still be self-closing (`<vaadin-label />`, `<menu separator />`). Rich text read from a design no longer gets the line breaks that the jsoup 1.8.3 pretty printer added. |
+
 ## Building a package
 
 The distribution files can be built by running the standard Maven goal `mvn install` in the project root.

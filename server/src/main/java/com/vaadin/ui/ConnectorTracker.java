@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M06/I48 (NPE in cleanStreamVariable, from Vaadin 8 52013fc6c6).
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -846,10 +848,12 @@ public class ConnectorTracker implements Serializable {
         }
         Map<String, StreamVariable> nameToStreamVar = pidToNameToStreamVariable
                 .get(connectorId);
-        StreamVariable streamVar = nameToStreamVar.remove(variableName);
-        streamVariableToSeckey.remove(streamVar);
-        if (nameToStreamVar.isEmpty()) {
-            pidToNameToStreamVariable.remove(connectorId);
+        if (nameToStreamVar != null) {
+            StreamVariable streamVar = nameToStreamVar.remove(variableName);
+            streamVariableToSeckey.remove(streamVar);
+            if (nameToStreamVar.isEmpty()) {
+                pidToNameToStreamVariable.remove(connectorId);
+            }
         }
     }
 

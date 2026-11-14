@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M05/I52 (CVE-2025-15022), escaped action captions; written by LuxLabs.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -175,7 +177,8 @@ public class ActionManager
                 final String akey = actionMapper.key(a);
                 paintTarget.addAttribute("key", akey);
                 if (a.getCaption() != null) {
-                    paintTarget.addAttribute("caption", a.getCaption());
+                    paintTarget.addAttribute("caption",
+                            a.getCaptionAsClientHtml());
                 }
                 if (a.getIcon() != null) {
                     paintTarget.addAttribute("icon", a.getIcon());

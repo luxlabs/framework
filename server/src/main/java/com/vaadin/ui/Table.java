@@ -1,6 +1,8 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
  *
+ * Modified by LuxLabs in 2026: M05/I52 (CVE-2025-15022), escaped action captions; written by LuxLabs.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -3626,7 +3628,7 @@ public class Table extends AbstractSelect implements Action.Container,
             for (Action a : actionSet) {
                 target.startTag("action");
                 if (a.getCaption() != null) {
-                    target.addAttribute("caption", a.getCaption());
+                    target.addAttribute("caption", a.getCaptionAsClientHtml());
                 }
                 if (a.getIcon() != null) {
                     target.addAttribute("icon", a.getIcon());
