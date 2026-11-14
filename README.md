@@ -73,7 +73,7 @@ Not affected, declared with OpenVEX: CVE-2026-110737 (M07: with Atmosphere `2.2.
 | I56 | an expired session answers 403 instead of 410, and the client shows the session expired message |
 | I14 | ComboBox: typing fast and leaving with Tab selects or adds the typed value |
 | I15 | Grid: adding columns while other columns are hidden no longer throws `IndexOutOfBoundsException` |
-| I40, I44 | ComboBox: the open popup is not moved back to its default position at every update; the part of I44 that I40 needs (the menu padding in the position check) is kept, the rest of I44 is not included |
+| I40, I44 | ComboBox: the open popup is not moved back to its default position at every update. I40 includes I44 in full as a technical dependency (a popup opened to the left stays in view and takes into account the margin, border and padding of the menu); the I44 defect was not reproduced separately on 7.7.17 |
 
 ### Not fixed or removed
 
@@ -108,6 +108,7 @@ Other notes of 7.7.18 to 7.7.55 (license, license checker, Multiplatform Runtime
 | Request body size (M17) | UIDL requests and push messages over `maxRequestBodySize` characters (default 32 MiB) fail without being read further; uploads are not affected | set the servlet init parameter `maxRequestBodySize` or the system property `vaadin.maxRequestBodySize`; `-1` disables the limit |
 | Expired session (I56) | 403 instead of 410 | — |
 | Error responses (M16) | not cacheable | — |
+| Push with long polling (known limitation) | an intermittent stall in Atmosphere 2.2.13.vaadin1 can stop the delivery of updates. It is also present in the original 7.7.17. The fork does not fix it, because Atmosphere updates are excluded | — |
 
 ## Build
 
