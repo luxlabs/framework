@@ -720,6 +720,11 @@ public abstract class VaadinService implements Serializable {
             try {
                 unlockSession(wrappedSession);
             } catch (IllegalStateException e) {
+                if (!isInvalidated(wrappedSession)) {
+                    // the session is still valid: an error of the hook
+                    // itself, propagated as in 7.7.17 (review R2)
+                    throw e;
+                }
                 // Another thread has invalidated the session meanwhile:
                 // unlockSession cannot read the lock from it. Release the
                 // instance that this thread locked, unless it was already
@@ -731,7 +736,11 @@ public abstract class VaadinService implements Serializable {
                         reentrant.unlock();
                     }
                 } else if (lock != null) {
-                    lock.unlock();
+                    try {
+                        lock.unlock();
+                    } catch (IllegalMonitorStateException alreadyReleased) {
+                        // released by the hook before it failed
+                    }
                 }
             }
         }
@@ -749,6 +758,19 @@ public abstract class VaadinService implements Serializable {
      * @throws SessionExpiredException
      * @throws ServiceException
      */
+    /**
+     * Checks whether a session has been invalidated: reading an attribute of
+     * an invalidated session throws IllegalStateException.
+     */
+    private boolean isInvalidated(WrappedSession wrappedSession) {
+        try {
+            wrappedSession.getAttribute(getLockAttributeName());
+            return false;
+        } catch (IllegalStateException e) {
+            return true;
+        }
+    }
+
     private VaadinSession doFindOrCreateVaadinSession(VaadinRequest request,
             boolean requestCanCreateSession)
             throws SessionExpiredException, ServiceException {
