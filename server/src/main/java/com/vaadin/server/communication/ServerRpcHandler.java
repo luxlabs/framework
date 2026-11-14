@@ -681,11 +681,19 @@ public class ServerRpcHandler implements Serializable {
 
         @Override
         public int read(char[] cbuf, int off, int len) throws IOException {
+            if (len == 0) {
+                return 0;
+            }
             if (count > maxSize) {
                 throw exceeded();
             }
-            // read at most one character beyond the limit, to detect it
-            int n = in.read(cbuf, off, (int) Math.min(len, maxSize - count + 1));
+            // Read at most one character beyond the limit, to detect it.
+            // 0 <= count <= maxSize here, so the subtraction cannot overflow;
+            // remaining + 1 is computed only when remaining < len, that is
+            // when it fits in an int (review R4: maxSize = Long.MAX_VALUE).
+            long remaining = maxSize - count;
+            int toRead = remaining >= len ? len : (int) remaining + 1;
+            int n = in.read(cbuf, off, toRead);
             if (n > 0) {
                 count += n;
                 if (count > maxSize) {
