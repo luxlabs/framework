@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: I05/M04, caption as text unless captionAsHtml (from Vaadin 8 0035aa1d).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -97,10 +98,11 @@ public class PanelConnector extends AbstractSingleComponentContainerConnector
             getWidget().captionNode.setClassName(VPanel.CLASSNAME + "-caption");
             boolean hasCaption = false;
             if (getState().caption != null && !"".equals(getState().caption)) {
-                getWidget().setCaption(getState().caption);
+                getWidget().setCaption(getState().caption,
+                        getState().captionAsHtml);
                 hasCaption = true;
             } else {
-                getWidget().setCaption("");
+                getWidget().setCaption("", false);
                 getWidget().captionNode
                         .setClassName(VPanel.CLASSNAME + "-nocaption");
             }

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- REM F2c: module for GWTTestCase tests run in production mode (-prod), which need the
+     connector bundle generator of the default widgetset (for example tests of VFilterSelect,
+     whose JSNI the development mode rewriter rejects). -->
+<module>
+    <inherits name="com.vaadin.DefaultWidgetSet" />
+    <source path="client" />
+</module>

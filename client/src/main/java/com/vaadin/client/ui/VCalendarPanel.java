@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: I02, key down navigation on Firefox 65+ (from Vaadin 8 47711930).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -52,7 +53,6 @@ import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.InlineHTML;
 import com.google.gwt.user.client.ui.ListBox;
 import com.google.gwt.user.client.ui.Widget;
-import com.vaadin.client.BrowserInfo;
 import com.vaadin.client.DateTimeService;
 import com.vaadin.client.WidgetUtil;
 import com.vaadin.client.VConsole;
@@ -211,11 +211,11 @@ public class VCalendarPanel extends FocusableFlexTable implements
         Roles.getGridRole().set(getElement());
 
         /*
-         * Firefox auto-repeat works correctly only if we use a key press
-         * handler, other browsers handle it correctly when using a key down
-         * handler
+         * Firefox prior to v65 auto-repeat works correctly only if we use a key
+         * press handler, other browsers handle it correctly when using a key
+         * down handler
          */
-        if (BrowserInfo.get().isGecko()) {
+        if (VMenuBar.useOldGeckoNavigation()) {
             addKeyPressHandler(this);
         } else {
             addKeyDownHandler(this);

@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: I02, key down navigation on Firefox 65+ (from Vaadin 8 47711930).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -33,7 +34,6 @@ import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.ui.HTML;
 import com.google.gwt.user.client.ui.HasValue;
 import com.vaadin.client.ApplicationConnection;
-import com.vaadin.client.BrowserInfo;
 import com.vaadin.client.WidgetUtil;
 import com.vaadin.shared.ui.slider.SliderOrientation;
 
@@ -283,10 +283,7 @@ public class VSlider extends SimpleFocusablePanel
             increaseValue(true);
         } else if (DOM.eventGetType(event) == Event.MOUSEEVENTS) {
             processBaseEvent(event);
-        } else if (BrowserInfo.get().isGecko()
-                && DOM.eventGetType(event) == Event.ONKEYPRESS
-                || !BrowserInfo.get().isGecko()
-                        && DOM.eventGetType(event) == Event.ONKEYDOWN) {
+        } else if (isNavigationEvent(event)) {
 
             if (handleNavigation(event.getKeyCode(), event.getCtrlKey(),
                     event.getShiftKey())) {
@@ -310,6 +307,14 @@ public class VSlider extends SimpleFocusablePanel
         if (WidgetUtil.isTouchEvent(event)) {
             event.preventDefault(); // avoid simulated events
             event.stopPropagation();
+        }
+    }
+
+    private boolean isNavigationEvent(Event event) {
+        if (VMenuBar.useOldGeckoNavigation()) {
+            return DOM.eventGetType(event) == Event.ONKEYPRESS;
+        } else {
+            return DOM.eventGetType(event) == Event.ONKEYDOWN;
         }
     }
 

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- REM F2c: browser fixture for the Chromium checks of the client side items
+     (I02 on Chromium, I03, I05/M04, I10, I55, I01, I15, I40, I44, and the
+     reproductions of I14, I42, I46). Not part of the Vaadin reactor. Built
+     twice, against the base (7.7.17.1 at f54ba34f) and the candidate, each
+     from its own Maven head. Same Jetty as the F2d fixture. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>rem.f2c</groupId>
+    <artifactId>f2c-fixture</artifactId>
+    <version>1</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <vaadin.version>7.7.17.1</vaadin.version>
+        <jetty.version>9.4.19.v20190610</jetty.version>
+    </properties>
+
+    <dependencies>
+        <dependency><groupId>com.vaadin</groupId><artifactId>vaadin-server</artifactId><version>${vaadin.version}</version></dependency>
+        <dependency><groupId>com.vaadin</groupId><artifactId>vaadin-client-compiled</artifactId><version>${vaadin.version}</version></dependency>
+        <dependency><groupId>com.vaadin</groupId><artifactId>vaadin-themes</artifactId><version>${vaadin.version}</version></dependency>
+        <dependency><groupId>javax.servlet</groupId><artifactId>javax.servlet-api</artifactId><version>3.1.0</version></dependency>
+        <dependency><groupId>org.eclipse.jetty</groupId><artifactId>jetty-server</artifactId><version>${jetty.version}</version></dependency>
+        <dependency><groupId>org.eclipse.jetty</groupId><artifactId>jetty-servlet</artifactId><version>${jetty.version}</version></dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- versions pinned to those of the Vaadin 7.7.17 build, in the offline cache -->
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.5.1</version>
+            </plugin>
+            <plugin>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>2.6</version>
+            </plugin>
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.19.1</version>
+            </plugin>
+            <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.6</version>
+            </plugin>
+            <plugin>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>2.10</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>

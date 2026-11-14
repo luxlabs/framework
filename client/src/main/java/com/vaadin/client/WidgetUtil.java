@@ -1,5 +1,6 @@
 /*
  * Copyright 2000-2018 Vaadin Ltd.
+ * Modified by LuxLabs in 2026: I03, autocomplete off in Chrome (from Vaadin 8 7392bf24, d213a424, 06947c6f); I03, autocomplete off also for Chromium user agents not detected as Chrome (written for the fork); I46, save and restore a text selection (written for the fork).
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -44,6 +45,7 @@ import com.google.gwt.user.client.Event;
 import com.google.gwt.user.client.EventListener;
 import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.ui.RootPanel;
+import com.google.gwt.user.client.ui.TextBox;
 import com.google.gwt.user.client.ui.Widget;
 import com.vaadin.shared.ui.ErrorLevel;
 import com.vaadin.shared.util.SharedUtil;
@@ -1393,6 +1395,122 @@ public class WidgetUtil {
     }-*/;
 
     /**
+     * Saves the text selection of the document if it starts and ends inside
+     * the given element, is not empty and is anchored to a text node (which
+     * re-rendering would replace), as character offsets in the text of the
+     * element.
+     * <p>
+     * For internal use only. May be removed or replaced in the future.
+     *
+     * @param container
+     *            the element
+     * @return the saved selection, or {@code null} if there is nothing to save
+     * @since 7.7.17.1
+     */
+    public static native JavaScriptObject saveTextSelection(Element container)
+    /*-{
+        if (!container || !$wnd.getSelection || !$doc.createRange) {
+            return null;
+        }
+        var sel = $wnd.getSelection();
+        if (!sel || sel.rangeCount == 0 || sel.isCollapsed) {
+            return null;
+        }
+        var range = sel.getRangeAt(0);
+        var inside = function(node) {
+            while (node) {
+                if (node === container) {
+                    return true;
+                }
+                node = node.parentNode;
+            }
+            return false;
+        };
+        if (!inside(range.startContainer) || !inside(range.endContainer)) {
+            return null;
+        }
+        if (range.startContainer.nodeType != 3
+                && range.endContainer.nodeType != 3) {
+            // Anchored to elements (e.g. a triple click selection): it
+            // survives the replacement of the text nodes, nothing to do
+            return null;
+        }
+        var offset = function(node, nodeOffset) {
+            var before = $doc.createRange();
+            before.setStart(container, 0);
+            before.setEnd(node, nodeOffset);
+            return before.toString().length;
+        };
+        return {
+            start: offset(range.startContainer, range.startOffset),
+            end: offset(range.endContainer, range.endOffset),
+            text: container.textContent,
+            selected: range.toString()
+        };
+    }-*/;
+
+    /**
+     * Restores a text selection saved with
+     * {@link #saveTextSelection(Element)}, if the text of the element has not
+     * changed and the browser has lost the selection.
+     * <p>
+     * For internal use only. May be removed or replaced in the future.
+     *
+     * @param container
+     *            the element
+     * @param saved
+     *            the saved selection, may be {@code null}
+     * @since 7.7.17.1
+     */
+    public static native void restoreTextSelection(Element container,
+            JavaScriptObject saved)
+    /*-{
+        if (!saved || !container || container.textContent !== saved.text) {
+            return;
+        }
+        var sel = $wnd.getSelection();
+        if (sel.rangeCount > 0 && !sel.isCollapsed
+                && sel.toString() === saved.selected) {
+            // The browser kept the selection: leave it alone
+            return;
+        }
+        var locate = function(target) {
+            var walker = $doc.createTreeWalker(container, 4, null, false);
+            var seen = 0;
+            var node;
+            var last = null;
+            while ((node = walker.nextNode())) {
+                var length = node.nodeValue.length;
+                if (target <= seen + length) {
+                    return { node: node, offset: target - seen };
+                }
+                seen += length;
+                last = node;
+            }
+            return last ? { node: last, offset: last.nodeValue.length } : null;
+        };
+        var start = locate(saved.start);
+        var end = locate(saved.end);
+        if (!start || !end) {
+            return;
+        }
+        var range = $doc.createRange();
+        range.setStart(start.node, start.offset);
+        range.setEnd(end.node, end.offset);
+        if (sel.rangeCount > 0) {
+            var current = sel.getRangeAt(0);
+            if (current.startContainer === range.startContainer
+                    && current.startOffset === range.startOffset
+                    && current.endContainer === range.endContainer
+                    && current.endOffset === range.endOffset) {
+                return;
+            }
+        }
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }-*/;
+
+    /**
      * JavaScript hack to clear text selection in various browsers.
      *
      * @since 7.6
@@ -1932,5 +2050,54 @@ public class WidgetUtil {
                 }
             }
         }
+    }
+
+    /**
+     * Stops the browser from showing its own suggestion popup for the given
+     * text box.
+     * <p>
+     * For internal use only. May be removed or replaced in the future.
+     *
+     * @param textBox
+     *            the text box, not {@code null}
+     * @since 7.7.17.1
+     */
+    public static void disableBrowserAutocomplete(TextBox textBox) {
+        /*-
+         * Stop the browser from showing its own suggestion popup.
+         *
+         * Using an invalid value instead of "off" as suggested by
+         * https://developer.mozilla.org/en-US/docs/Web/Security/Securing_your_site/Turning_off_form_autocompletion
+         *
+         * Leaving the non-standard Safari options autocapitalize and
+         * autocorrect untouched since those do not interfere in the same
+         * way, and they might be useful in a combo box where new items are
+         * allowed.
+         */
+        if (BrowserInfo.get().isChrome()
+                || isChromiumUserAgent(BrowserInfo.getBrowserString())) {
+            // Chrome supports "off" and the invalid value does not work with
+            // Chrome
+            textBox.getElement().setAttribute("autocomplete", "off");
+        } else {
+            textBox.getElement().setAttribute("autocomplete", "nope");
+        }
+    }
+
+    /**
+     * Tells whether the user agent is a Chromium based browser, including
+     * those that {@link BrowserInfo#isChrome()} does not recognize, such as
+     * headless Chrome ({@code HeadlessChrome/}).
+     * <p>
+     * For internal use only. May be removed or replaced in the future.
+     *
+     * @param userAgent
+     *            the user agent string, may be {@code null}
+     * @return {@code true} if the user agent contains a Chrome version token
+     * @since 7.7.17.1
+     */
+    public static boolean isChromiumUserAgent(String userAgent) {
+        return userAgent != null
+                && userAgent.toLowerCase().contains("chrome/");
     }
 }
