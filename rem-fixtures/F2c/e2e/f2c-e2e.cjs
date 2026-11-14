@@ -161,7 +161,7 @@ async function popupRect(page) {
   });
 }
 
-// I44 (no correction, non regression): popup opened to the left at the right edge stays inside the view.
+// I44 (kept as a dependency of I40, defect not reproduced): popup opened to the left at the right edge stays inside the view.
 async function popupLeft(page, d) {
   await page.click('#combo-right .v-filterselect-button');
   await page.waitForSelector('.v-filterselect-suggestpopup', { timeout: 5000 });
@@ -376,7 +376,7 @@ async function responsive(page, d, logs) {
     await scenario(browser, 'i05-panel', 'I05/M04', RG, null, 'panel', panelCaption);
     await scenario(browser, 'i02-keyboard', 'I02', GG, null, 'keyboard', keyboard);
     await scenario(browser, 'i03-autocomplete', 'I03', RG, null, 'combo', autocomplete);
-    await scenario(browser, 'i44-popup-left', 'I44', NOREG, null, 'combo', popupLeft);
+    await scenario(browser, 'i44-popup-left', 'I44', 'green on base and candidate (correction kept as a dependency of I40, defect not reproduced on 7.7.17)', null, 'combo', popupLeft);
     await scenario(browser, 'i40-popup-positions', 'I40', RG, null, 'combo', popupPositions);
     await scenario(browser, 'i14-fast-tab', 'I14', RG, null, 'combo', fastTab);
     await scenario(browser, 'i42-popup-scroll', 'I42', NOREG, null, 'combo', popupScroll);

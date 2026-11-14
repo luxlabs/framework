@@ -13,6 +13,7 @@ Not part of the Vaadin reactor. Chromium checks of the F2c client side items, ru
 | `i02-keyboard` | I02 (Chromium) | green on both: key down navigation unchanged on Chromium |
 | `i03-autocomplete`, `i14-fast-tab`, `i40-popup-positions` | I03, I14, I40 | red on base, green on candidate |
 | `i10-table-select`, `i15-grid-add-column`, `i55-responsive`, `i46-grid-select-*` | I10, I15, I55, I46 | red on base, green on candidate |
-| `i01-grid-sort`, `i44-popup-left`, `i42-popup-scroll` | I01, I44, I42 | green on both: defect not reproduced on 7.7.17, no correction (non regression check) |
+| `i01-grid-sort`, `i42-popup-scroll` | I01, I42 | green on both: defect not reproduced on 7.7.17, no correction (non regression check) |
+| `i44-popup-left` | I44 | green on both: defect not reproduced on 7.7.17, correction kept because I40 uses its padding calculation |
 
 The GWTTestCase tests without a browser are in `client/src/test-gwt/java` and run with `prove-gwt.sh` in the card folder.
