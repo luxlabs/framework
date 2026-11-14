@@ -2546,9 +2546,12 @@ public class VFilterSelect extends Composite
 
         focused = false;
         if (!readonly) {
-            if (textInputEnabled && waitingForFilteringResponse && !prompting) {
+            if (textInputEnabled && waitingForFilteringResponse && !prompting
+                    && !"".equals(tb.getText())) {
                 // Typed fast and left the field: the filtering response has
-                // not arrived yet, handle the typed text when it arrives (I14)
+                // not arrived yet, handle the typed text when it arrives
+                // (I14). An empty text is handled as in 7.7.17 below (for
+                // example it clears the selection of a nullable ComboBox).
                 textToHandleAfterBlur = tb.getText();
                 updateSelectionWhenReponseIsReceived = false;
             } else {
